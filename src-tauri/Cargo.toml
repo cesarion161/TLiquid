@@ -1,0 +1,50 @@
+[package]
+name = "tliquid"
+version = "0.1.0"
+description = "TLiquid — macOS-first BYOK LLM translator"
+authors = ["TLiquid contributors"]
+edition = "2021"
+license = "MIT"
+rust-version = "1.77"
+
+[lib]
+# The `_lib` suffix keeps the library name distinct from the binary on Windows.
+# See https://github.com/rust-lang/cargo/issues/8519
+name = "tliquid_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-opener = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-log = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+log = "0.4"
+
+# HTTP client for direct BYOK provider calls (P0-008+). Uses the system TLS
+# stack (Secure Transport on macOS), so no OpenSSL build dependency.
+reqwest = { version = "0.12", features = ["json"] }
+
+# Secure secret storage. `apple-native` maps directly onto the macOS Keychain.
+keyring = { version = "3", features = ["apple-native"] }
+
+async-trait = "0.1"
+
+# Single-instance is a desktop-only concern.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
+
+[profile.release]
+# Optimize for a small always-running utility (PRD §13.1 footprint targets).
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
