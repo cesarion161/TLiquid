@@ -240,3 +240,25 @@ Five of the six in-scope tasks (P1-001, P1-002, P1-004, P1-007, P1-009) are **do
 peer-reviewed; **P1-008 stays in-progress** pending an Apple Developer account. Sign-off is
 pending the §7 on-device checklist (and signing) — the interactive parts an automated,
 display-less environment can't exercise.
+
+## 9. Post-Phase-1 follow-up changes (re-verified)
+
+After Phase 1 sign-off, three owner-requested UX changes were made and put through the same
+commit → fresh-context review → fix loop (reviewer approved the code; only minor doc/cosmetic
+nits, fixed):
+- **No-selection hotkey opens the panel empty** (was a silent no-op) — `shortcuts.rs`.
+- **Notification bell** (left of the gear) hosting the launch-at-login consent (moved out of
+  the inline banner so it no longer shifts the translate UI) + a placeholder for new-version
+  alerts (deferred to the Phase 2 update check, P2-007 — no automatic update check added).
+- **Shortcut-limit clarification** in Settings → Shortcuts (modifiers + one key).
+
+Re-verified after these changes: `pnpm check` 0 · `cargo fmt --check` · `cargo clippy -D
+warnings` · `cargo test` **78 passed** · IPC **22/22/22** aligned · full `pnpm tauri build`
+produced **`TLiquid.app` + `TLiquid_0.1.0_aarch64.dmg` (2.4 MB)**.
+
+**Screenshot/UI attempt:** I tried `screencapture` again — a display and WindowServer are
+present, but capture is denied (`could not create image from display`: no Screen-Recording
+permission / non-interactive session for this process), and the WKWebView doesn't mount
+without an interactive session. **Visual UI verification + screenshots require your
+interactive Mac session** (the §7 checklist, plus a glance at the new bell/badge and the
+empty-panel-on-no-selection behavior).
