@@ -27,10 +27,10 @@
   // translate immediately (overridable later in Models). If one is ever rejected
   // by a provider, the user just picks another from the model list.
   const DEFAULT_MODELS: Partial<Record<ProviderId, string>> = {
-    openai: "gpt-4o-mini",
-    anthropic: "claude-3-5-haiku-latest",
-    gemini: "gemini-2.0-flash",
-    openrouter: "openai/gpt-4o-mini",
+    openai: "gpt-5-mini",
+    anthropic: "claude-haiku-4-5",
+    gemini: "gemini-2.5-flash",
+    openrouter: "openai/gpt-5-mini",
   };
 
   type Status =

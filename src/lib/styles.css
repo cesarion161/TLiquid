@@ -244,7 +244,7 @@ body {
 /* Translation output area: fills remaining height and scrolls on overflow. */
 .output {
   flex: 1;
-  min-height: 64px;
+  min-height: 48px;
   padding: var(--tl-sp-3);
   border: 1px solid var(--tl-border);
   border-radius: var(--tl-radius);

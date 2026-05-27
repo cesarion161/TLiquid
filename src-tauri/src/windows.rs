@@ -10,11 +10,16 @@
 //! - `always_on_top` + `visible_on_all_workspaces` + the app's Accessory
 //!   activation policy let it float above other apps, including fullscreen
 //!   Spaces, so it can be summoned from anywhere (PRD §19.2).
-//! - Anchored under the tray icon (using the icon's screen rect) for every
-//!   summon — tray click or hotkey — so it always drops down from the menu bar.
+//! - Draggable + position-remembering (Raycast-style): on first run it anchors
+//!   under the tray icon; the user can drag it anywhere (via the titlebar drag
+//!   region) and the position is remembered across hides and restarts. Once it
+//!   has a place, summoning reuses it rather than re-anchoring.
 //! - Auto-hides when it loses focus (click outside / switch apps), Spotlight-
 //!   style; re-summon via the tray icon or a hotkey.
 
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{
     AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
     WindowEvent,
@@ -25,9 +30,21 @@ pub const PANEL_LABEL: &str = "main";
 
 // Compact utility size; the input and translation areas scroll on overflow.
 const PANEL_WIDTH: f64 = 360.0;
-const PANEL_HEIGHT: f64 = 400.0;
+const PANEL_HEIGHT: f64 = 270.0;
 /// Gap kept between the panel and the screen edges / menu bar.
 const MARGIN: f64 = 8.0;
+
+/// Whether the panel has been given a position this session (restored from disk
+/// or anchored under the tray on first show). Once placed, summoning no longer
+/// repositions it, so a user-dragged location sticks.
+static PLACED: AtomicBool = AtomicBool::new(false);
+
+/// Persisted panel position (physical pixels), stored next to `settings.json`.
+#[derive(Serialize, Deserialize)]
+struct SavedPosition {
+    x: i32,
+    y: i32,
+}
 
 /// Create the panel up front, hidden. Called once during setup.
 pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
@@ -45,10 +62,16 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
         .visible(false) // shown on demand from the tray / hotkey
         .build()?;
 
-    // TLiquid is an always-running menu-bar utility (FR-005). A close gesture
-    // (e.g. Cmd+W) must dismiss the panel, not tear it down: closing the only
-    // window would otherwise let the app exit. Hiding keeps the process alive
-    // in the background and reuses the warm webview on the next summon (PRD §13.2).
+    // Restore the remembered position from a previous run, if it's still on a
+    // connected monitor (guards against a saved spot on a now-disconnected
+    // display). If restored, the panel is "placed" and won't be re-anchored.
+    if let Some((x, y)) = load_position(app) {
+        if is_on_some_monitor(&window, x, y) {
+            let _ = window.set_position(PhysicalPosition::new(x, y));
+            PLACED.store(true, Ordering::Relaxed);
+        }
+    }
+
     let panel = window.clone();
     window.on_window_event(move |event| match event {
         // A close gesture (e.g. Cmd+W) must dismiss the panel, not tear it down:
@@ -56,11 +79,13 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
         // menu-bar process alive and reuses the warm webview (FR-005, PRD §13.2).
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
+            persist_position(&panel);
             let _ = panel.hide();
         }
         // Auto-hide when focus is lost (click outside / switch apps), like
-        // Spotlight/Raycast. Re-summon via the tray icon or a hotkey (PRD §19.2).
+        // Spotlight/Raycast. Remember where it was so it reopens there.
         WindowEvent::Focused(false) => {
+            persist_position(&panel);
             let _ = panel.hide();
         }
         _ => {}
@@ -68,16 +93,66 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Summon the panel: anchor it under the tray icon, show, and focus it.
+/// Summon the panel: show and focus it, anchoring under the tray icon only the
+/// first time (until it has a remembered/dragged position). Drag it via the
+/// titlebar to move it; the new spot is remembered.
 pub fn show_panel(app: &AppHandle) -> tauri::Result<()> {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return Ok(());
     };
-    // Best-effort positioning — never block the show on a failed anchor.
-    let _ = position_under_tray(&window);
+    if !PLACED.load(Ordering::Relaxed) {
+        // Best-effort first placement — never block the show on a failed anchor.
+        let _ = position_under_tray(&window);
+        PLACED.store(true, Ordering::Relaxed);
+    }
     window.show()?;
     window.set_focus()?;
     Ok(())
+}
+
+/// Path of the remembered-position file, beside `settings.json`.
+fn state_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|dir| dir.join("window.json"))
+}
+
+/// The last-saved panel position, if any.
+fn load_position(app: &AppHandle) -> Option<(i32, i32)> {
+    let contents = std::fs::read_to_string(state_path(app)?).ok()?;
+    let pos: SavedPosition = serde_json::from_str(&contents).ok()?;
+    Some((pos.x, pos.y))
+}
+
+/// Save the panel's current position (best-effort) so it reopens there.
+fn persist_position(window: &WebviewWindow) {
+    let app = window.app_handle();
+    let Ok(pos) = window.outer_position() else {
+        return;
+    };
+    let Some(path) = state_path(app) else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(json) = serde_json::to_string(&SavedPosition { x: pos.x, y: pos.y }) {
+        let _ = std::fs::write(path, json);
+    }
+}
+
+/// Whether `(x, y)` (a window top-left) falls within some connected monitor, so
+/// a restored window isn't stranded off-screen after a display change.
+fn is_on_some_monitor(window: &WebviewWindow, x: i32, y: i32) -> bool {
+    let Ok(monitors) = window.available_monitors() else {
+        return false;
+    };
+    monitors.iter().any(|m| {
+        let p = m.position();
+        let s = m.size();
+        x >= p.x && y >= p.y && x < p.x + s.width as i32 && y < p.y + s.height as i32
+    })
 }
 
 /// Place the panel just below the tray icon, horizontally centered on it and
