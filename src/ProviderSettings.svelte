@@ -81,8 +81,9 @@
     if (!isTauri()) return;
     try {
       providers = (await listProviders()).filter((p) => p.available);
+      // `providers.ollama` is always present (non-optional in the Rust config).
       endpointInput =
-        settings.providers.ollama?.endpoint ?? DEFAULT_OLLAMA_ENDPOINT;
+        settings.providers.ollama.endpoint ?? DEFAULT_OLLAMA_ENDPOINT;
       for (const p of providers) {
         if (isOllama(p.id)) {
           // Keyless: configured by endpoint, which always has a value.
@@ -192,8 +193,12 @@
     status.ollama = { kind: "testing" };
     try {
       // Reachable server → ok; unreachable → throws a clear network error.
+      // (Ollama has no key to "reject", so a non-ok is treated as unreachable
+      // rather than the misleading "Invalid key".)
       const ok = await testProviderKey("ollama", ollamaEndpoint());
-      status.ollama = ok ? { kind: "valid" } : { kind: "invalid" };
+      status.ollama = ok
+        ? { kind: "valid" }
+        : { kind: "failed", message: "Ollama did not respond as expected." };
     } catch (e) {
       status.ollama = { kind: "failed", message: String(e) };
     }

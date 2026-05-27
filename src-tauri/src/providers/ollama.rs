@@ -44,6 +44,10 @@ fn model_ids(resp: TagsResponse) -> Vec<String> {
 #[derive(Deserialize)]
 struct ChatResponse {
     message: Option<ChatMessage>,
+    /// Ollama can report a failure as a 200 body `{"error":"..."}` (e.g. a
+    /// runtime/model error), not an HTTP error status — surface it (FR-018).
+    #[serde(default)]
+    error: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -54,6 +58,9 @@ struct ChatMessage {
 
 impl ChatResponse {
     fn into_text(self) -> Result<String> {
+        if let Some(err) = self.error {
+            return Err(AppError::Provider(format!("{NAME}: {err}")));
+        }
         self.message
             .map(|m| m.content)
             .filter(|t| !t.is_empty())
@@ -68,6 +75,13 @@ fn stream_delta(line: &str) -> Option<String> {
     let v: serde_json::Value = serde_json::from_str(line).ok()?;
     let text = v.get("message")?.get("content")?.as_str()?;
     (!text.is_empty()).then(|| text.to_string())
+}
+
+/// A top-level `{"error":"..."}` Ollama may emit as a 200 NDJSON line mid-stream
+/// (the local server is keyless, so the message is non-secret). Pure/tested.
+fn stream_error(line: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(line).ok()?;
+    v.get("error").and_then(|e| e.as_str()).map(str::to_string)
 }
 
 fn chat_body(model: &str, prompt: &Prompt, stream: bool) -> serde_json::Value {
@@ -130,6 +144,9 @@ impl Provider for Ollama {
             .json(&chat_body(model, prompt, true));
         let mut acc = String::new();
         http::stream_ndjson(NAME, req, |line| {
+            if let Some(err) = stream_error(line) {
+                return Err(AppError::Provider(format!("{NAME}: {err}")));
+            }
             if let Some(delta) = stream_delta(line) {
                 acc.push_str(&delta);
                 on_delta(delta);
@@ -188,5 +205,17 @@ mod tests {
         // The terminating chunk carries done:true with empty content.
         let line = r#"{"message":{"role":"assistant","content":""},"done":true}"#;
         assert_eq!(stream_delta(line), None);
+    }
+
+    #[test]
+    fn surfaces_error_field_streaming_and_non_streaming() {
+        // 200-status error body: both paths report the cause, not "no text".
+        let line = r#"{"error":"model 'foo' not found"}"#;
+        assert_eq!(stream_error(line).as_deref(), Some("model 'foo' not found"));
+        assert_eq!(stream_error(r#"{"message":{"content":"hi"}}"#), None);
+
+        let resp: ChatResponse = serde_json::from_str(line).unwrap();
+        let err = resp.into_text().unwrap_err().to_string();
+        assert!(err.contains("model 'foo' not found"));
     }
 }

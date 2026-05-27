@@ -79,7 +79,8 @@ pub struct TranslationResponse {
 pub struct ProviderMeta {
     pub id: ProviderId,
     pub display_name: String,
-    /// Selectable in Phase 0. Ollama/local models are Phase 1 (FR-039).
+    /// Whether the provider is selectable. All five are available now —
+    /// the four cloud providers plus Ollama (local, P1-004).
     pub available: bool,
     pub supports_streaming: bool,
 }
