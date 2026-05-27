@@ -79,8 +79,59 @@ pnpm tauri build --no-bundle
 pnpm tauri build
 ```
 
-> Producing a signed/notarized installable artifact is tracked separately in
-> task **P0-019**; an unsigned local build is fine for MVP testing.
+## Install (macOS)
+
+`pnpm tauri build` produces a self-contained, installable app bundle under
+`src-tauri/target/release/bundle/`:
+
+```text
+src-tauri/target/release/bundle/
+├─ macos/TLiquid.app                 # the installable app bundle (~4.7 MB)
+└─ dmg/TLiquid_0.1.0_<arch>.dmg      # drag-to-install disk image (GUI Macs)
+```
+
+**TLiquid.app** is the installable artifact: open the `.dmg` and drag it to
+`/Applications`, or just double-click the `.app`. Launch it; it appears as a
+menu-bar icon.
+
+> **Headless/CI note:** the styled `.dmg` step (`bundle_dmg.sh`) drives Finder via
+> AppleScript to lay out the disk-image window, so it needs a GUI session and can
+> fail in headless/CI environments (which is why CI runs `--no-bundle`). The
+> `.app` is always produced regardless. To package a disk image without Finder:
+>
+> ```bash
+> hdiutil create -volname TLiquid -ov -format UDZO \
+>   -srcfolder src-tauri/target/release/bundle/macos/TLiquid.app \
+>   TLiquid_0.1.0_aarch64.dmg
+> ```
+
+### Unsigned build — bypassing Gatekeeper
+
+Phase 0 ships **unsigned and un-notarized** (see below), so on first launch macOS
+Gatekeeper will say *"TLiquid can't be opened because Apple cannot check it for
+malicious software."* This is expected for a local/MVP build. To open it:
+
+- **Right-click** (or Control-click) TLiquid.app → **Open** → **Open** in the
+  dialog. macOS remembers the choice for future launches; **or**
+- clear the quarantine attribute:
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/TLiquid.app
+  ```
+
+### First-run permission
+
+Selected-text capture simulates ⌘C, which requires **Accessibility** permission.
+macOS prompts the first time you use a translation hotkey; grant TLiquid access in
+**System Settings → Privacy & Security → Accessibility**. (The app also offers a
+one-click shortcut to that pane when a capture fails.) Manual translation in the
+panel needs no special permission.
+
+### Signing & notarization (deferred)
+
+Code signing and notarization are **deferred in Phase 0** (FR-075): they require a
+paid Apple Developer account, which this MVP doesn't assume. An unsigned local
+build is acceptable for internal testing — use the Gatekeeper bypass above.
+Producing a signed, notarized release is tracked as **P1-008**.
 
 ## Lint, format & test
 
