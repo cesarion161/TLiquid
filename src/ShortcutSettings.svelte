@@ -17,8 +17,19 @@
     type Settings,
   } from "./lib/tauri";
 
-  let { settings, onChange }: { settings: Settings; onChange: () => void } =
-    $props();
+  let {
+    settings,
+    onChange,
+    hidden = false,
+  }: {
+    settings: Settings;
+    // persist() is async; await it so re-registration reads the saved config.
+    onChange: () => void | Promise<void>;
+    // True when the Settings view is off-screen. Single-window app: navigating
+    // away doesn't unmount or blur us, so we cancel an in-progress recording
+    // here to avoid leaving global shortcuts paused / swallowing keystrokes.
+    hidden?: boolean;
+  } = $props();
 
   // Mirror config::Settings::default() (src-tauri/src/config.rs) for reset.
   const DEFAULT_PRIMARY = "Cmd+Shift+T";
@@ -29,6 +40,13 @@
   // or null. While set, global shortcuts are paused and keydowns are captured.
   let recording = $state<string | null>(null);
   let recordError = $state("");
+
+  // Single-window app: navigating to the translate view hides (not unmounts) this
+  // section and doesn't blur the webview, so cancel any in-progress recording —
+  // otherwise global shortcuts stay paused and the capture listener swallows keys.
+  $effect(() => {
+    if (hidden && recording !== null) cancelRecording();
+  });
 
   const GLYPH: Record<string, string> = {
     Cmd: "⌘", Command: "⌘", Super: "⌘",
@@ -54,10 +72,25 @@
     if (recording !== null && isTauri()) void applyShortcuts().catch(() => {});
   });
 
+  // Re-register the live shortcuts directly (used to restore them after a
+  // recording pause, which isn't a settings change).
   async function reapply() {
     if (!isTauri()) return;
     try {
       errors = await applyShortcuts();
+    } catch (e) {
+      errors = [String(e)];
+    }
+  }
+
+  // Persist a change, then refresh the displayed errors. `persist` re-registers
+  // shortcuts after saving, so awaiting it first means we read the result of the
+  // just-saved config (no save/apply race), then surface its conflicts/failures.
+  async function persistAndRefresh() {
+    await onChange();
+    if (!isTauri()) return;
+    try {
+      errors = await shortcutErrors();
     } catch (e) {
       errors = [String(e)];
     }
@@ -89,7 +122,7 @@
     const code = e.code;
     if (/^Key[A-Z]$/.test(code)) return code.slice(3);
     if (/^Digit[0-9]$/.test(code)) return code.slice(5);
-    if (/^F\d{1,2}$/.test(code)) return code;
+    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) return code; // F1–F24 (plugin range)
     const map: Record<string, string> = {
       Space: "Space", Enter: "Enter", Tab: "Tab",
       Backspace: "Backspace", Delete: "Delete",
@@ -143,16 +176,14 @@
     }
     recording = null;
     recordError = "";
-    onChange();
-    await reapply(); // re-register, surfacing conflicts/failures
+    await persistAndRefresh(); // save + re-register, surfacing conflicts/failures
   }
 
   async function clearShortcut(code: string) {
     const lang = settings.languages.additional.find((l) => l.code === code);
     if (lang?.shortcut) {
       lang.shortcut = null;
-      onChange();
-      await reapply();
+      await persistAndRefresh();
     }
   }
 
@@ -160,16 +191,15 @@
     cancelRecording();
     settings.shortcuts.translatePrimary = DEFAULT_PRIMARY;
     settings.shortcuts.translateSecondary = DEFAULT_SECONDARY;
+    settings.shortcuts.enabled = true; // defaults have shortcuts enabled
     for (const l of settings.languages.additional) l.shortcut = null;
     recordError = "";
-    onChange();
-    await reapply();
+    await persistAndRefresh();
   }
 
   async function toggleEnabled(e: Event) {
     settings.shortcuts.enabled = (e.currentTarget as HTMLInputElement).checked;
-    onChange();
-    await reapply();
+    await persistAndRefresh();
   }
 </script>
 

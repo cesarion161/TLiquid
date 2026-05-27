@@ -43,34 +43,7 @@ pub fn apply(app: &AppHandle) -> Vec<String> {
     let settings = crate::config::load(app);
     let mut errors = Vec::new();
     if settings.shortcuts.enabled {
-        // The configured (accelerator, action, label) entries, in priority order.
-        let mut entries: Vec<(String, Action, String)> = vec![
-            (
-                settings.shortcuts.translate_primary.clone(),
-                Action::Primary,
-                "Translate selection".to_string(),
-            ),
-            (
-                settings.shortcuts.translate_secondary.clone(),
-                Action::Secondary,
-                "Translate to secondary".to_string(),
-            ),
-        ];
-        for lang in &settings.languages.additional {
-            if let Some(accel) = lang.shortcut.as_deref().map(str::trim) {
-                if !accel.is_empty() {
-                    entries.push((
-                        accel.to_string(),
-                        Action::Explicit(Language {
-                            code: lang.code.clone(),
-                            name: lang.name.clone(),
-                        }),
-                        format!("Translate to {}", lang.name),
-                    ));
-                }
-            }
-        }
-
+        let entries = build_entries(&settings);
         // Register each unique accelerator once; report duplicates as conflicts
         // so two actions can't fight over the same combo (FR-033).
         let accels: Vec<(&str, &str)> = entries
@@ -111,6 +84,38 @@ pub fn is_valid(accelerator: &str) -> bool {
     accelerator
         .parse::<tauri_plugin_global_shortcut::Shortcut>()
         .is_ok()
+}
+
+/// Build the `(accelerator, action, label)` entries to register from settings,
+/// in priority order: primary, secondary, then each additional language that has
+/// a non-blank shortcut (P1-002). Pure, so the skip/label logic is unit-tested.
+fn build_entries(settings: &crate::config::Settings) -> Vec<(String, Action, String)> {
+    let mut entries = vec![
+        (
+            settings.shortcuts.translate_primary.clone(),
+            Action::Primary,
+            "Translate selection".to_string(),
+        ),
+        (
+            settings.shortcuts.translate_secondary.clone(),
+            Action::Secondary,
+            "Translate to secondary".to_string(),
+        ),
+    ];
+    for lang in &settings.languages.additional {
+        let accel = lang.shortcut.as_deref().map(str::trim).unwrap_or("");
+        if !accel.is_empty() {
+            entries.push((
+                accel.to_string(),
+                Action::Explicit(Language {
+                    code: lang.code.clone(),
+                    name: lang.name.clone(),
+                }),
+                format!("Translate to {}", lang.name),
+            ));
+        }
+    }
+    entries
 }
 
 /// Given each entry's `(accelerator, label)` in priority order, return the
@@ -220,5 +225,50 @@ mod tests {
         let (to_register, conflicts) = resolve_conflicts(&entries);
         assert_eq!(to_register, vec![0, 1]);
         assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn build_entries_includes_primary_secondary_and_assigned_additionals() {
+        use crate::config::{AdditionalLanguage, Settings};
+        let mut settings = Settings::default();
+        settings.languages.additional = vec![
+            AdditionalLanguage {
+                code: "de".into(),
+                name: "German".into(),
+                enabled: true,
+                shortcut: Some("Cmd+Shift+G".into()),
+            },
+            // No shortcut → skipped.
+            AdditionalLanguage {
+                code: "fr".into(),
+                name: "French".into(),
+                enabled: true,
+                shortcut: None,
+            },
+            // Blank/whitespace shortcut → skipped.
+            AdditionalLanguage {
+                code: "es".into(),
+                name: "Spanish".into(),
+                enabled: true,
+                shortcut: Some("  ".into()),
+            },
+        ];
+
+        let entries = build_entries(&settings);
+        let labels: Vec<&str> = entries.iter().map(|(_, _, l)| l.as_str()).collect();
+        assert_eq!(
+            labels,
+            vec![
+                "Translate selection",
+                "Translate to secondary",
+                "Translate to German",
+            ]
+        );
+        // The German entry is an explicit-target action for the right language.
+        match &entries[2].1 {
+            Action::Explicit(lang) => assert_eq!(lang.code, "de"),
+            _ => panic!("expected an explicit-target action for German"),
+        }
+        assert_eq!(entries[2].0, "Cmd+Shift+G");
     }
 }

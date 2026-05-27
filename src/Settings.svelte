@@ -2,7 +2,13 @@
   import { onMount } from "svelte";
   import { isTauri } from "@tauri-apps/api/core";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { getSettings, saveSettings, settingsPath, type Settings } from "./lib/tauri";
+  import {
+    getSettings,
+    saveSettings,
+    settingsPath,
+    applyShortcuts,
+    type Settings,
+  } from "./lib/tauri";
   import LanguageSettings from "./LanguageSettings.svelte";
   import ShortcutSettings from "./ShortcutSettings.svelte";
   import ProviderSettings from "./ProviderSettings.svelte";
@@ -45,6 +51,10 @@
     try {
       await saveSettings(settings);
       saveError = null;
+      // Keep the registered global shortcuts in sync with the saved config —
+      // e.g. removing an additional language must drop its hotkey (P1-002). The
+      // save is awaited first so the re-register reads the new config (no race).
+      await applyShortcuts();
     } catch (e) {
       saveError = `Could not save settings: ${e}`;
     }
@@ -77,7 +87,7 @@
   {/if}
 
   {#if settings}
-    <ShortcutSettings {settings} onChange={persist} />
+    <ShortcutSettings {settings} onChange={persist} {hidden} />
     <ProviderSettings {settings} onChange={persist} />
   {/if}
 
