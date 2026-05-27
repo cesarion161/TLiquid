@@ -33,8 +33,14 @@ thiserror = "2"
 log = "0.4"
 
 # HTTP client for direct BYOK provider calls (P0-008+). Uses the system TLS
-# stack (Secure Transport on macOS), so no OpenSSL build dependency.
-reqwest = { version = "0.12", features = ["json"] }
+# stack (Secure Transport on macOS), so no OpenSSL build dependency. The
+# `stream` feature backs streaming translation (P1-009): `bytes_stream()` over
+# the SSE response.
+reqwest = { version = "0.12", features = ["json", "stream"] }
+
+# `StreamExt::next` to drive `reqwest`'s byte stream (P1-009 streaming). Already
+# in the dependency tree via reqwest/tokio, so this adds no real weight.
+futures-util = "0.3"
 
 # Secure secret storage. `apple-native` maps directly onto the macOS Keychain.
 keyring = { version = "3", features = ["apple-native"] }

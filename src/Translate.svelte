@@ -10,10 +10,15 @@
   import {
     getSettings,
     translate as runTranslate,
+    translateStream,
+    listProviders,
     openAccessibilitySettings,
+    Channel,
     type Settings,
     type Language,
     type RoutingMode,
+    type ProviderMeta,
+    type TranslationDelta,
   } from "./lib/tauri";
   import Result from "./Result.svelte";
 
@@ -45,6 +50,9 @@
 
   let settings = $state<Settings | null>(null);
   let settingsPromise: Promise<Settings> | null = null;
+  // Provider metadata (static), fetched once, used to decide whether to stream.
+  let providerMeta: ProviderMeta[] | null = null;
+  let providerMetaPromise: Promise<ProviderMeta[]> | null = null;
   let sourceText = $state("");
   let targetValue = $state("auto"); // "auto" (primary routing) or a language code
   let translating = $state(false);
@@ -82,6 +90,7 @@
 
   onMount(() => {
     window.addEventListener("keydown", onWindowKeydown);
+    void ensureProviderMeta(); // warm the streaming-capability check
   });
 
   onDestroy(() => window.removeEventListener("keydown", onWindowKeydown));
@@ -117,6 +126,20 @@
     }
   }
 
+  // Load provider metadata once (deduped). Best-effort: if it fails we just fall
+  // back to the non-streaming path.
+  async function ensureProviderMeta(): Promise<ProviderMeta[] | null> {
+    if (providerMeta) return providerMeta;
+    if (!isTauri()) return null;
+    if (!providerMetaPromise) providerMetaPromise = listProviders();
+    try {
+      providerMeta = await providerMetaPromise;
+    } catch {
+      /* leave null → non-streaming fallback */
+    }
+    return providerMeta;
+  }
+
   // The single translation path used by the manual button and the hotkey flow.
   async function runTranslation(
     text: string,
@@ -126,25 +149,42 @@
     if (translating || !text.trim()) return;
     const s = await ensureSettings();
     if (!s?.defaultModel) return; // not ready; the source is prefilled, hint shows
+    const model = s.defaultModel;
     error = null;
     copied = false;
     output = null;
     permissionHelp = false; // a provider error is not a permission problem
     translating = true;
+    const req = {
+      sourceText: text,
+      routingMode: mode,
+      explicitTargetLanguage: explicit,
+      provider: s.defaultProvider,
+      model,
+      preserveFormatting: true,
+    };
     try {
-      const resp = await runTranslate({
-        sourceText: text,
-        routingMode: mode,
-        explicitTargetLanguage: explicit,
-        provider: s.defaultProvider,
-        model: s.defaultModel,
-        preserveFormatting: true,
-      });
-      output = resp.translatedText;
+      const meta = (await ensureProviderMeta())?.find(
+        (p) => p.id === s.defaultProvider,
+      );
+      if (meta?.supportsStreaming) {
+        // Stream: append deltas as they arrive, then settle on the trimmed final.
+        output = "";
+        const channel = new Channel<TranslationDelta>();
+        channel.onmessage = (d) => {
+          output = (output ?? "") + d.text;
+        };
+        const resp = await translateStream(req, channel);
+        output = resp.translatedText;
+      } else {
+        const resp = await runTranslate(req);
+        output = resp.translatedText;
+      }
       // Move focus off the input so Enter copies the result (see onWindowKeydown).
       sourceEl?.blur();
     } catch (e) {
       error = String(e);
+      output = null; // discard any partial stream on failure
     } finally {
       translating = false;
     }
@@ -204,7 +244,7 @@
   }
 
   async function copy() {
-    if (!output) return;
+    if (!output || translating) return; // don't copy a partial stream
     // Reset first so `copied` reflects only this attempt (copyAndDismiss gates
     // on it) and a stale copy error doesn't linger over a successful re-copy.
     copied = false;
@@ -243,7 +283,14 @@
   // and dismisses the panel. Ignored while the Settings view is active so it
   // can't fire on a stale result from behind Settings.
   function onWindowKeydown(e: KeyboardEvent) {
-    if (active && e.key === "Enter" && !e.shiftKey && output && e.target !== sourceEl) {
+    if (
+      active &&
+      e.key === "Enter" &&
+      !e.shiftKey &&
+      output &&
+      !translating && // wait for the stream to finish before Enter copies
+      e.target !== sourceEl
+    ) {
       e.preventDefault();
       copyAndDismiss();
     }

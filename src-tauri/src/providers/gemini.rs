@@ -78,6 +78,23 @@ struct ModelEntry {
     supported_generation_methods: Vec<String>,
 }
 
+/// Pull the incremental text from one streaming chunk: concatenate the text of
+/// `candidates[0].content.parts[*]`. Pure, so it is unit-tested.
+fn stream_delta(data: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(data).ok()?;
+    let parts = v
+        .get("candidates")?
+        .get(0)?
+        .get("content")?
+        .get("parts")?
+        .as_array()?;
+    let text: String = parts
+        .iter()
+        .filter_map(|p| p.get("text").and_then(|t| t.as_str()))
+        .collect();
+    (!text.is_empty()).then_some(text)
+}
+
 /// Keep only models usable for text generation, stripping the "models/" prefix.
 fn model_ids(resp: ModelsResponse) -> Vec<String> {
     resp.models
@@ -104,6 +121,9 @@ impl Provider for Gemini {
     }
     fn display_name(&self) -> &'static str {
         NAME
+    }
+    fn supports_streaming(&self) -> bool {
+        true
     }
 
     async fn validate_key(&self, api_key: &str) -> Result<bool> {
@@ -133,6 +153,42 @@ impl Provider for Gemini {
         let resp: GenerateResponse = http::send_json(NAME, req).await?;
         resp.into_text()
     }
+
+    async fn translate_stream(
+        &self,
+        api_key: &str,
+        model: &str,
+        prompt: &Prompt,
+        on_delta: &(dyn Fn(String) + Send + Sync),
+    ) -> Result<String> {
+        let body = serde_json::json!({
+            "systemInstruction": { "parts": [ { "text": prompt.system } ] },
+            "contents": [ { "role": "user", "parts": [ { "text": prompt.user } ] } ],
+        });
+        // `?alt=sse` makes streamGenerateContent emit SSE `data:` frames rather
+        // than a single JSON array, so the shared SSE reader can consume it.
+        let req = http::client()
+            .post(format!(
+                "{BASE}/models/{model}:streamGenerateContent?alt=sse"
+            ))
+            .header(API_KEY_HEADER, api_key)
+            .json(&body);
+        let mut acc = String::new();
+        http::stream_sse(NAME, req, |data| {
+            if let Some(delta) = stream_delta(data) {
+                acc.push_str(&delta);
+                on_delta(delta);
+            }
+            Ok(())
+        })
+        .await?;
+        if acc.is_empty() {
+            return Err(AppError::Provider(format!(
+                "{NAME}: the model returned no text."
+            )));
+        }
+        Ok(acc)
+    }
 }
 
 #[cfg(test)]
@@ -150,6 +206,21 @@ mod tests {
     fn empty_candidates_is_an_error() {
         let resp: GenerateResponse = serde_json::from_str(r#"{"candidates":[]}"#).unwrap();
         assert!(resp.into_text().is_err());
+    }
+
+    #[test]
+    fn stream_delta_concatenates_candidate_parts() {
+        let chunk = r#"{"candidates":[{"content":{"parts":[{"text":"Hal"},{"text":"lo"}]}}]}"#;
+        assert_eq!(stream_delta(chunk).as_deref(), Some("Hallo"));
+    }
+
+    #[test]
+    fn stream_delta_ignores_chunks_without_text() {
+        // A trailing chunk may carry only finishReason/usage, no parts text.
+        assert_eq!(
+            stream_delta(r#"{"candidates":[{"finishReason":"STOP"}]}"#),
+            None
+        );
     }
 
     #[test]

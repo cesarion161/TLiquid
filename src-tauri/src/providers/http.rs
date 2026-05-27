@@ -49,6 +49,66 @@ pub async fn send_json<T: DeserializeOwned>(
         .map_err(|_| AppError::Provider(format!("{provider}: could not parse the response.")))
 }
 
+/// Stream a Server-Sent Events response (P1-009). Sends `request`, normalizes a
+/// non-success status exactly like [`send_json`] (so a 401 streaming request
+/// still yields the no-key-leak message), then reads the body incrementally and
+/// invokes `on_data` once per `data:` payload line — excluding the `[DONE]`
+/// sentinel and empty keep-alive lines. Adapters parse each payload themselves,
+/// so this stays provider-neutral.
+///
+/// Bytes are buffered and only decoded a full line at a time, so a multi-byte
+/// UTF-8 character split across two network chunks is never corrupted.
+pub async fn stream_sse(
+    provider: &str,
+    request: reqwest::RequestBuilder,
+    mut on_data: impl FnMut(&str) -> Result<()>,
+) -> Result<()> {
+    use futures_util::StreamExt;
+
+    let resp = request
+        .send()
+        .await
+        .map_err(|e| transport_error(provider, e))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        return Err(AppError::Provider(http_error_message(
+            provider,
+            status.as_u16(),
+            &body,
+        )));
+    }
+
+    let mut stream = resp.bytes_stream();
+    let mut buf: Vec<u8> = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| transport_error(provider, e))?;
+        buf.extend_from_slice(&chunk);
+        // Drain whole lines as they complete; partial trailing bytes stay buffered.
+        while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
+            let line: Vec<u8> = buf.drain(..=pos).collect();
+            let line = String::from_utf8_lossy(&line);
+            if let Some(payload) = sse_data_payload(&line) {
+                on_data(payload)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Extract the `data:` payload of a single SSE line, if it carries real data.
+/// Returns an empty iterator for `event:`/comment/blank lines, the `[DONE]`
+/// sentinel, and empty payloads. Pure, so it is unit-tested.
+fn sse_data_payload(line: &str) -> Option<&str> {
+    let line = line.trim_end_matches(['\r', '\n']);
+    let data = line.strip_prefix("data:")?.trim();
+    if data.is_empty() || data == "[DONE]" {
+        None
+    } else {
+        Some(data)
+    }
+}
+
 /// Send `request` purely to validate a key: `Ok(true)` on success, `Ok(false)`
 /// on 401/403 (key rejected), `Err` for anything else.
 pub async fn validate_status(provider: &str, request: reqwest::RequestBuilder) -> Result<bool> {
@@ -190,5 +250,21 @@ mod tests {
         let msg = http_error_message("X", 400, &body);
         assert!(!msg.contains('\n'));
         assert!(msg.ends_with('…') || msg.len() < 200 + 40);
+    }
+
+    #[test]
+    fn sse_payload_extracts_data_lines() {
+        assert_eq!(sse_data_payload("data: {\"a\":1}\n"), Some("{\"a\":1}"));
+        // Tolerates a missing space after the colon and CRLF endings.
+        assert_eq!(sse_data_payload("data:{\"a\":1}\r\n"), Some("{\"a\":1}"));
+    }
+
+    #[test]
+    fn sse_payload_skips_done_blank_and_non_data_lines() {
+        assert_eq!(sse_data_payload("data: [DONE]\n"), None);
+        assert_eq!(sse_data_payload("data: \n"), None);
+        assert_eq!(sse_data_payload("\n"), None);
+        assert_eq!(sse_data_payload("event: message\n"), None);
+        assert_eq!(sse_data_payload(": keep-alive comment\n"), None);
     }
 }

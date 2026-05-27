@@ -56,6 +56,19 @@ fn model_ids(resp: ModelsResponse) -> Vec<String> {
     ids
 }
 
+/// Pull the incremental text from one streaming chunk: `choices[0].delta.content`.
+/// `None` for role-only/empty/`finish_reason` chunks. Pure, so it is unit-tested.
+fn stream_delta(data: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(data).ok()?;
+    let text = v
+        .get("choices")?
+        .get(0)?
+        .get("delta")?
+        .get("content")?
+        .as_str()?;
+    (!text.is_empty()).then(|| text.to_string())
+}
+
 #[async_trait]
 impl Provider for OpenAi {
     fn id(&self) -> ProviderId {
@@ -63,6 +76,9 @@ impl Provider for OpenAi {
     }
     fn display_name(&self) -> &'static str {
         NAME
+    }
+    fn supports_streaming(&self) -> bool {
+        true
     }
 
     async fn validate_key(&self, api_key: &str) -> Result<bool> {
@@ -95,6 +111,42 @@ impl Provider for OpenAi {
         let resp: ChatResponse = http::send_json(NAME, req).await?;
         resp.into_text()
     }
+
+    async fn translate_stream(
+        &self,
+        api_key: &str,
+        model: &str,
+        prompt: &Prompt,
+        on_delta: &(dyn Fn(String) + Send + Sync),
+    ) -> Result<String> {
+        let body = serde_json::json!({
+            "model": model,
+            "stream": true,
+            "messages": [
+                { "role": "system", "content": prompt.system },
+                { "role": "user", "content": prompt.user },
+            ],
+        });
+        let req = http::client()
+            .post(format!("{BASE}/chat/completions"))
+            .bearer_auth(api_key)
+            .json(&body);
+        let mut acc = String::new();
+        http::stream_sse(NAME, req, |data| {
+            if let Some(delta) = stream_delta(data) {
+                acc.push_str(&delta);
+                on_delta(delta);
+            }
+            Ok(())
+        })
+        .await?;
+        if acc.is_empty() {
+            return Err(AppError::Provider(format!(
+                "{NAME}: the model returned no text."
+            )));
+        }
+        Ok(acc)
+    }
 }
 
 #[cfg(test)]
@@ -119,5 +171,24 @@ mod tests {
         let json = r#"{"data":[{"id":"gpt-4o"},{"id":"gpt-3.5-turbo"}]}"#;
         let resp: ModelsResponse = serde_json::from_str(json).unwrap();
         assert_eq!(model_ids(resp), vec!["gpt-3.5-turbo", "gpt-4o"]);
+    }
+
+    #[test]
+    fn stream_delta_extracts_content_chunks() {
+        let chunk = r#"{"choices":[{"delta":{"content":"Ho"}}]}"#;
+        assert_eq!(stream_delta(chunk).as_deref(), Some("Ho"));
+    }
+
+    #[test]
+    fn stream_delta_ignores_role_only_and_final_chunks() {
+        // First chunk carries only the role; last carries finish_reason, no content.
+        assert_eq!(
+            stream_delta(r#"{"choices":[{"delta":{"role":"assistant"}}]}"#),
+            None
+        );
+        assert_eq!(
+            stream_delta(r#"{"choices":[{"delta":{},"finish_reason":"stop"}]}"#),
+            None
+        );
     }
 }

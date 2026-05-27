@@ -1,7 +1,7 @@
 // Typed wrappers around the Rust commands exposed by TLiquid's Tauri backend.
 // Keeping IPC in one place means the Svelte windows never call `invoke` directly
 // and the request/response shapes stay in sync with `src-tauri/src/commands.rs`.
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 
 export type ProviderId =
   | "openai"
@@ -122,3 +122,24 @@ export const listProviderModels = (provider: ProviderId): Promise<string[]> =>
 export const translate = (
   request: TranslationRequest,
 ): Promise<TranslationResponse> => invoke("translate", { request });
+
+/** One incremental text chunk streamed during a translation (P1-009). */
+export interface TranslationDelta {
+  text: string;
+}
+
+// Re-export Channel so callers create the streaming channel without importing
+// `@tauri-apps/api` directly (this module is the only IPC site).
+export { Channel };
+
+/**
+ * Streaming translation (P1-009). `onEvent` receives `{ text }` deltas as the
+ * provider produces them; the returned promise resolves with the complete
+ * `TranslationResponse` (trimmed final text) once the stream ends. Used only
+ * for providers whose `supportsStreaming` is true; otherwise use `translate`.
+ */
+export const translateStream = (
+  request: TranslationRequest,
+  onEvent: Channel<TranslationDelta>,
+): Promise<TranslationResponse> =>
+  invoke("translate_stream", { request, onEvent });

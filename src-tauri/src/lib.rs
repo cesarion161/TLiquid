@@ -95,6 +95,7 @@ pub fn run() {
             commands::test_provider_connection,
             commands::list_provider_models,
             commands::translate,
+            commands::translate_stream,
             commands::apply_shortcuts,
             commands::shortcut_errors,
             commands::open_accessibility_settings,

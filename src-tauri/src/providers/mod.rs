@@ -113,6 +113,32 @@ pub trait Provider: Send + Sync {
     /// wraps the result in a [`TranslationResponse`]; adapters stay response-
     /// agnostic so error/latency assembly lives in one place.
     async fn translate(&self, api_key: &str, model: &str, prompt: &Prompt) -> Result<String>;
+
+    /// Run a translation, invoking `on_delta` with each incremental text chunk
+    /// as it streams in (P1-009), and return the full completion text. The
+    /// orchestrator passes a sink that forwards deltas to a Tauri channel; the
+    /// adapter still returns the complete text so response assembly (latency,
+    /// trimming, [`TranslationResponse`]) stays in one place and Enter-to-copy
+    /// works on the finished result.
+    ///
+    /// The sink takes the chunk by value — adapters already build an owned
+    /// `String` per chunk, so moving it in avoids a copy (and sidesteps an
+    /// `async_trait` lifetime pitfall with `&str` callback args).
+    ///
+    /// Default: the non-streaming fallback — run [`Provider::translate`] and
+    /// emit the whole completion as a single chunk. Providers that genuinely
+    /// stream override this and return `true` from [`Provider::supports_streaming`].
+    async fn translate_stream(
+        &self,
+        api_key: &str,
+        model: &str,
+        prompt: &Prompt,
+        on_delta: &(dyn Fn(String) + Send + Sync),
+    ) -> Result<String> {
+        let text = self.translate(api_key, model, prompt).await?;
+        on_delta(text.clone());
+        Ok(text)
+    }
 }
 
 /// Construct the adapter for a provider id.

@@ -277,8 +277,9 @@ translation and is disclosed here intentionally.
   can't be preserved. A selection identical to the current clipboard reads as
   "no selection."
 - **Unsigned build** — see the Gatekeeper bypass above.
-- **Non-streaming.** Translations appear all at once when the provider responds
-  (streaming output is a Phase 1 goal).
+- **Streaming output** (P1-009): translations from the cloud providers stream in
+  incrementally; press **Enter** once it finishes to copy the complete text.
+  (Local models will stream once Ollama lands in P1-004.)
 - **Local models (Ollama)** are not available yet (Phase 1).
 - The result's target-language label is best-effort in Auto/primary mode (the
   model picks the real target from the detected source).

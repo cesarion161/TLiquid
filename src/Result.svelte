@@ -34,17 +34,20 @@
     >
       {#if error}
         <span class="error">{error}</span>
+      {:else if output}
+        <!-- Shown while streaming too: output grows as deltas arrive (busy stays
+             true until the stream ends), so it takes precedence over "Translating…". -->
+        {output}
       {:else if busy}
         Translating…
-      {:else if output}
-        {output}
       {:else}
         Translation output appears here.
       {/if}
     </div>
 
-    {#if output}
-      <!-- Pinned in the field's bottom-right corner, inside the box. -->
+    {#if output && !busy}
+      <!-- Pinned in the field's bottom-right corner, inside the box. Only once
+           the stream has finished, so Enter/Copy act on the complete text. -->
       <div class="output-actions">
         <span class="hint">{copied ? "Copied!" : "Press Enter to copy"}</span>
         <button

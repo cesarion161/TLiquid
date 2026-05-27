@@ -63,6 +63,23 @@ fn model_ids(resp: ModelsResponse) -> Vec<String> {
     resp.data.into_iter().map(|m| m.id).collect()
 }
 
+/// Pull the incremental text from one Anthropic stream event: only
+/// `content_block_delta` events with a `text_delta` carry output text. Other
+/// event types (`message_start`, `ping`, `message_stop`, …) yield `None`. Pure,
+/// so it is unit-tested.
+fn stream_delta(data: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(data).ok()?;
+    if v.get("type")?.as_str()? != "content_block_delta" {
+        return None;
+    }
+    let delta = v.get("delta")?;
+    if delta.get("type")?.as_str()? != "text_delta" {
+        return None;
+    }
+    let text = delta.get("text")?.as_str()?;
+    (!text.is_empty()).then(|| text.to_string())
+}
+
 impl Anthropic {
     fn models_request(api_key: &str) -> reqwest::RequestBuilder {
         http::client()
@@ -79,6 +96,9 @@ impl Provider for Anthropic {
     }
     fn display_name(&self) -> &'static str {
         NAME
+    }
+    fn supports_streaming(&self) -> bool {
+        true
     }
 
     async fn validate_key(&self, api_key: &str) -> Result<bool> {
@@ -104,6 +124,42 @@ impl Provider for Anthropic {
             .json(&body);
         let resp: MessagesResponse = http::send_json(NAME, req).await?;
         resp.into_text()
+    }
+
+    async fn translate_stream(
+        &self,
+        api_key: &str,
+        model: &str,
+        prompt: &Prompt,
+        on_delta: &(dyn Fn(String) + Send + Sync),
+    ) -> Result<String> {
+        let body = serde_json::json!({
+            "model": model,
+            "max_tokens": MAX_TOKENS,
+            "stream": true,
+            "system": prompt.system,
+            "messages": [ { "role": "user", "content": prompt.user } ],
+        });
+        let req = http::client()
+            .post(format!("{BASE}/messages"))
+            .header("x-api-key", api_key)
+            .header("anthropic-version", VERSION)
+            .json(&body);
+        let mut acc = String::new();
+        http::stream_sse(NAME, req, |data| {
+            if let Some(delta) = stream_delta(data) {
+                acc.push_str(&delta);
+                on_delta(delta);
+            }
+            Ok(())
+        })
+        .await?;
+        if acc.is_empty() {
+            return Err(AppError::Provider(format!(
+                "{NAME}: the model returned no text."
+            )));
+        }
+        Ok(acc)
     }
 }
 
@@ -136,5 +192,27 @@ mod tests {
         let json = r#"{"data":[{"id":"claude-opus-4-6"},{"id":"claude-haiku-4-5"}]}"#;
         let resp: ModelsResponse = serde_json::from_str(json).unwrap();
         assert_eq!(model_ids(resp), vec!["claude-opus-4-6", "claude-haiku-4-5"]);
+    }
+
+    #[test]
+    fn stream_delta_extracts_text_deltas_only() {
+        let chunk = r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Bon"}}"#;
+        assert_eq!(stream_delta(chunk).as_deref(), Some("Bon"));
+    }
+
+    #[test]
+    fn stream_delta_ignores_other_event_types() {
+        assert_eq!(
+            stream_delta(r#"{"type":"message_start","message":{}}"#),
+            None
+        );
+        assert_eq!(stream_delta(r#"{"type":"message_stop"}"#), None);
+        // A non-text delta (e.g. input_json_delta) is not output text.
+        assert_eq!(
+            stream_delta(
+                r#"{"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"{"}}"#
+            ),
+            None
+        );
     }
 }

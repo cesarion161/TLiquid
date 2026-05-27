@@ -113,50 +113,91 @@ pub async fn list_provider_models(provider: ProviderId) -> Result<Vec<String>> {
     providers::adapter(provider).list_models(&key).await
 }
 
-/// Translate text: resolve routing → build the provider-neutral prompt → look
-/// up the Keychain key → call the provider adapter → assemble the response.
-/// Non-streaming in Phase 0 (one `TranslationResponse`); streaming is P1-009.
-/// No source or translated text is persisted (FR-019).
-#[tauri::command]
-pub async fn translate(app: AppHandle, request: TranslationRequest) -> Result<TranslationResponse> {
-    let settings = config::load(&app);
-
-    // The orchestrator resolves routing and builds the prompt (pure, tested in
-    // `translation`); here we add the I/O: Keychain lookup, the provider call,
-    // and response assembly.
+/// Resolve routing → build the provider-neutral prompt → look up the Keychain
+/// key. The pure orchestration (routing + prompt) lives in `translation`; this
+/// adds the I/O (settings load + Keychain lookup) shared by both translate
+/// commands.
+fn prepare(
+    app: &AppHandle,
+    request: &TranslationRequest,
+) -> Result<(translation::TranslationPlan, String)> {
+    let settings = config::load(app);
     let plan = translation::plan(
         &settings,
         request.routing_mode,
         request.explicit_target_language.clone(),
         &request.source_text,
     )?;
-
     let key = secrets::get_key(request.provider.as_str())?.ok_or_else(|| {
         AppError::Provider(format!(
             "No API key configured for {}.",
             request.provider.as_str()
         ))
     })?;
+    Ok((plan, key))
+}
 
-    let started = std::time::Instant::now();
-    let translated_text = providers::adapter(request.provider)
-        .translate(&key, &request.model, &plan.prompt)
-        .await?;
+/// Assemble the final response from a completed (streamed or not) provider call.
+fn finish(
+    request: &TranslationRequest,
+    plan: translation::TranslationPlan,
+    started: std::time::Instant,
+    text: String,
+) -> TranslationResponse {
     let latency_ms = started.elapsed().as_millis() as u64;
-
     // Strip only the blank lines models tend to wrap answers in — not all
     // whitespace — so a code-block translation keeps its indentation and inner
     // formatting (the prompt promises to preserve it).
-    let translated_text = translated_text
-        .trim_matches(|c| c == '\n' || c == '\r')
-        .to_string();
-
-    Ok(TranslationResponse {
+    let translated_text = text.trim_matches(|c| c == '\n' || c == '\r').to_string();
+    TranslationResponse {
         translated_text,
         detected_source_language: None,
         target_language: plan.target_language,
         provider: request.provider,
-        model: request.model,
+        model: request.model.clone(),
         latency_ms,
-    })
+    }
+}
+
+/// Translate text and return one `TranslationResponse` (non-streaming). The
+/// streaming fallback for providers without `supports_streaming`. No source or
+/// translated text is persisted (FR-019).
+#[tauri::command]
+pub async fn translate(app: AppHandle, request: TranslationRequest) -> Result<TranslationResponse> {
+    let (plan, key) = prepare(&app, &request)?;
+    let started = std::time::Instant::now();
+    let text = providers::adapter(request.provider)
+        .translate(&key, &request.model, &plan.prompt)
+        .await?;
+    Ok(finish(&request, plan, started, text))
+}
+
+/// One incremental text chunk streamed to the panel (P1-009), sent over the
+/// Tauri channel as the provider produces it.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranslationDelta {
+    pub text: String,
+}
+
+/// Streaming translation (P1-009): forwards provider deltas to `on_event` as
+/// they arrive, then returns the complete `TranslationResponse` so the panel can
+/// settle on the trimmed final text (and Enter-to-copy copies the finished
+/// result). No translation text is persisted (FR-019).
+#[tauri::command]
+pub async fn translate_stream(
+    app: AppHandle,
+    request: TranslationRequest,
+    on_event: tauri::ipc::Channel<TranslationDelta>,
+) -> Result<TranslationResponse> {
+    let (plan, key) = prepare(&app, &request)?;
+    let started = std::time::Instant::now();
+    let sink = move |delta: String| {
+        // A send failure (e.g. the panel closed) shouldn't abort the translation.
+        let _ = on_event.send(TranslationDelta { text: delta });
+    };
+    let text = providers::adapter(request.provider)
+        .translate_stream(&key, &request.model, &plan.prompt, &sink)
+        .await?;
+    Ok(finish(&request, plan, started, text))
 }

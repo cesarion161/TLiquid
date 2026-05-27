@@ -95,7 +95,15 @@ Adding/changing a provider touches several places: the `ProviderId` enum + its `
 `adapter()` match arm + the `all()` list, a field on `config::Providers`, and the `ProviderId` union in `src/lib/tauri.ts`.
 
 **Transport decisions (PRD §15.5):** adapters use raw `reqwest` (system TLS, no OpenSSL) — **not provider
-SDKs** (none are first-party for Rust; the trait is already the abstraction). **Phase 0 is non-streaming**:
-the orchestrator awaits the full completion and returns one `TranslationResponse`, and `supports_streaming()` is
-`false` everywhere. Streaming (SSE for cloud providers / NDJSON for Ollama → a Tauri channel) is a Phase 1
-task (P1-009), so don't reach for `reqwest`'s `stream` feature in Phase 0.
+SDKs** (none are first-party for Rust; the trait is already the abstraction).
+
+**Streaming (P1-009):** the four cloud adapters now stream — they parse the provider's SSE response (via the
+shared `http::stream_sse`) and override `Provider::translate_stream`, returning `supports_streaming() == true`.
+`translate_stream` invokes an `on_delta: &(dyn Fn(String) + …)` sink per chunk **and** returns the full text, so
+response assembly (latency/trim/`TranslationResponse`) stays in one place and Enter-to-copy works on the finished
+result. The orchestration lives in `commands::translate_stream` (shared `prepare`/`finish` helpers with the
+non-streaming `commands::translate`): it wraps a Tauri `ipc::Channel<TranslationDelta>` in the sink, and the
+frontend (`Translate.svelte`) creates the `Channel`, appends `{text}` deltas as they arrive, then settles on the
+returned trimmed text. **The non-streaming `translate` command/path remains the fallback** — the frontend uses it
+for providers whose `supportsStreaming` is `false`, and the trait's default `translate_stream` also degrades to one
+`translate` call. Ollama still streams nothing (`supports_streaming() == false`); its NDJSON streaming is P1-004.
