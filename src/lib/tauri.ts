@@ -47,7 +47,7 @@ export interface TranslationResponse {
 // macOS Keychain and are referenced by provider id, never returned here.
 export interface Settings {
   version: number;
-  startup: { enabled: boolean };
+  startup: { enabled: boolean; prompted: boolean };
   ui: { theme: string; accentColor: string; openResultFrom: string };
   languages: {
     primary: Language;
@@ -113,6 +113,14 @@ export const openAccessibilitySettings = (): Promise<void> =>
 
 /** Local, copy-pasteable diagnostics report (no upload; FR-064/FR-065). */
 export const diagnostics = (): Promise<string> => invoke("diagnostics");
+
+/** Enable/disable launching TLiquid at login (P1-001, FR-053/055). */
+export const setLaunchAtLogin = (enabled: boolean): Promise<void> =>
+  invoke("set_launch_at_login", { enabled });
+
+/** The real OS launch-at-login state (P1-001, FR-053). */
+export const isLaunchAtLogin = (): Promise<boolean> =>
+  invoke("is_launch_at_login");
 
 export const setProviderKey = (provider: ProviderId, key: string): Promise<void> =>
   invoke("set_provider_key", { provider, key });

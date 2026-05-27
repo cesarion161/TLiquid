@@ -12,6 +12,7 @@
   import { isRecordingShortcut } from "./lib/recording";
   import LanguageSettings from "./LanguageSettings.svelte";
   import ShortcutSettings from "./ShortcutSettings.svelte";
+  import StartupSettings from "./StartupSettings.svelte";
   import ProviderSettings from "./ProviderSettings.svelte";
   import PrivacySettings from "./PrivacySettings.svelte";
   import AboutSettings from "./AboutSettings.svelte";
@@ -93,6 +94,7 @@
   {#if settings}
     <ShortcutSettings {settings} onChange={persist} {hidden} />
     <ProviderSettings {settings} onChange={persist} />
+    <StartupSettings {settings} onChange={persist} />
   {/if}
 
   <div class="section">

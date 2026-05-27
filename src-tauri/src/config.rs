@@ -29,6 +29,10 @@ pub struct Settings {
 #[serde(rename_all = "camelCase")]
 pub struct Startup {
     pub enabled: bool,
+    /// Whether the one-time launch-at-login consent has been shown (P1-001,
+    /// FR-054). Defaulted so older settings files load and first-run is detected.
+    #[serde(default)]
+    pub prompted: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -137,7 +141,10 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             version: 1,
-            startup: Startup { enabled: false },
+            startup: Startup {
+                enabled: false,
+                prompted: false,
+            },
             ui: Ui {
                 theme: "system".into(),
                 accent_color: "default".into(),

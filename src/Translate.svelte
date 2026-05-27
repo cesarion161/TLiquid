@@ -9,10 +9,12 @@
   import { writeText } from "@tauri-apps/plugin-clipboard-manager";
   import {
     getSettings,
+    saveSettings,
     translate as runTranslate,
     translateStream,
     listProviders,
     openAccessibilitySettings,
+    setLaunchAtLogin,
     Channel,
     type Settings,
     type Language,
@@ -71,6 +73,22 @@
 
   // A default model must be configured (in Settings → Models) to translate.
   const ready = $derived(!!settings?.defaultModel);
+
+  // First-run launch-at-login consent (P1-001, FR-054): offered once, ON is the
+  // recommended choice but never applied without the user's explicit click.
+  const showStartupConsent = $derived(!!settings && !settings.startup.prompted);
+
+  async function answerStartupConsent(enable: boolean) {
+    if (!settings) return;
+    settings.startup.enabled = enable;
+    settings.startup.prompted = true; // never ask again
+    try {
+      await saveSettings(settings);
+      await setLaunchAtLogin(enable);
+    } catch {
+      /* best-effort; the toggle in Settings → Startup can fix it later */
+    }
+  }
 
   // Target options: Auto, then each configured language as an explicit target.
   // Each carries the actual configured Language so an explicit translation uses
@@ -318,6 +336,16 @@
 </script>
 
 <section class="body" class:hidden>
+  {#if showStartupConsent}
+    <div class="consent" role="group" aria-label="Launch at login">
+      <span class="grow">Launch TLiquid at login? <span class="hint">Recommended — starts in the menu bar.</span></span>
+      <div class="row">
+        <button class="btn btn--primary" onclick={() => answerStartupConsent(true)}>Enable</button>
+        <button class="btn" onclick={() => answerStartupConsent(false)}>Not now</button>
+      </div>
+    </div>
+  {/if}
+
   <div class="field">
     <textarea
       class="textarea"
@@ -356,3 +384,18 @@
     onOpenAccessibility={openAccessibilitySettings}
   />
 </section>
+
+<style>
+  .consent {
+    display: flex;
+    align-items: center;
+    gap: var(--tl-sp-2);
+    padding: var(--tl-sp-2) var(--tl-sp-3);
+    border: 1px solid var(--tl-border);
+    border-radius: var(--tl-radius-sm);
+    background: var(--tl-surface);
+  }
+  .consent .row {
+    flex: none;
+  }
+</style>

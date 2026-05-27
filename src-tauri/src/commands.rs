@@ -4,7 +4,7 @@
 use crate::config::{self, Settings};
 use crate::error::{AppError, Result};
 use crate::providers::{self, ProviderId, ProviderMeta, TranslationRequest, TranslationResponse};
-use crate::{diagnostics, secrets, shortcuts, translation};
+use crate::{diagnostics, secrets, shortcuts, startup, translation};
 use tauri::AppHandle;
 
 #[tauri::command]
@@ -86,6 +86,20 @@ pub fn open_accessibility_settings() -> Result<()> {
 #[tauri::command]
 pub fn diagnostics(app: AppHandle) -> String {
     diagnostics::collect(&app).to_report()
+}
+
+/// Enable/disable launching TLiquid at login (P1-001, FR-053/055). The caller
+/// also persists `settings.startup.enabled`; this applies it to the OS.
+#[tauri::command]
+pub fn set_launch_at_login(app: AppHandle, enabled: bool) -> Result<()> {
+    startup::set_enabled(&app, enabled)
+}
+
+/// The real OS launch-at-login state (FR-053). Used by Settings to reflect the
+/// actual registration, not just the stored setting.
+#[tauri::command]
+pub fn is_launch_at_login(app: AppHandle) -> bool {
+    startup::is_enabled(&app)
 }
 
 #[tauri::command]

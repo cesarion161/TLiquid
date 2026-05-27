@@ -78,6 +78,7 @@ on the TS side. Mismatches surface as runtime deserialization errors, not type e
 - `languages.rs` — routing engine. `resolve()` returns a `Resolution`. Primary-mode routing is **not** resolved to one target up front — source detection happens inside the LLM, so the routing rules are encoded into the prompt (`PrimaryRouted`).
 - `translation.rs` — pure, provider-neutral prompt builders. No translation text is persisted anywhere.
 - `providers/` — provider abstraction (see below).
+- `startup.rs` — launch-at-login (P1-001) via `tauri-plugin-autostart` (macOS LaunchAgent). The user's intent lives in `config.startup.enabled`; `reconcile()` applies it to the OS at startup, and `set_launch_at_login`/`is_launch_at_login` commands drive/read it. The app always boots into Accessory/menu-bar mode, so a login launch is silent.
 - `diagnostics.rs` — local, copy-to-clipboard diagnostics report (P0-016). Non-secret metadata only, never uploaded.
 - `error.rs` — `AppError` serializes to its message string only. Messages must never embed API keys, prompts, translation text, or provider responses.
 

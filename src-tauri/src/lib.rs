@@ -19,6 +19,7 @@ mod languages;
 mod providers;
 mod secrets;
 mod shortcuts;
+mod startup;
 mod translation;
 mod tray;
 mod windows;
@@ -39,6 +40,14 @@ pub fn run() {
         let _ = windows::show_panel(app);
     }));
 
+    // Launch-at-login (P1-001). macOS LaunchAgent; the actual on/off is driven by
+    // settings (reconciled in `setup`). No extra args — we start to the tray.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_autostart::init(
+        tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+        None,
+    ));
+
     builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -57,6 +66,9 @@ pub fn run() {
             if let Err(e) = config::ensure_initialized(app.handle()) {
                 log::warn!("could not initialize settings file: {e}");
             }
+
+            // Make the OS launch-at-login state match the saved setting (P1-001).
+            startup::reconcile(app.handle());
 
             // Create the panel once, hidden, so summoning it later is an instant
             // show rather than a fresh webview load (PRD §13.2).
@@ -102,6 +114,8 @@ pub fn run() {
             commands::validate_shortcut,
             commands::open_accessibility_settings,
             commands::diagnostics,
+            commands::set_launch_at_login,
+            commands::is_launch_at_login,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TLiquid");

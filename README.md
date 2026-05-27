@@ -188,6 +188,10 @@ language is always used; **Auto** applies the primary/secondary rules
   language (and sets the Target to it). If no secondary is configured, the panel
   opens to **Settings** (Languages is at the top).
 
+**Launch at login** (P1-001): on first run TLiquid offers to start at login
+(recommended; nothing is enabled without your click). Change it anytime in
+**Settings → Startup** — it starts straight into the menu bar.
+
 The panel drops down under the menu-bar icon, **remembers where you drag it**, and
 **auto-hides when it loses focus** (click outside, switch apps, or press **Esc**) —
 re-open it from the tray icon (or the hotkey, with text selected). Shortcuts can be
