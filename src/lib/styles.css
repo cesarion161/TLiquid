@@ -128,9 +128,14 @@ body {
   cursor: pointer;
 }
 
-.icon-btn:hover {
+.icon-btn:hover:not(:disabled) {
   background: var(--tl-bg);
   color: var(--tl-text);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Scrollable content region beneath the titlebar. */

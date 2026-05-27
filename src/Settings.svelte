@@ -2,27 +2,46 @@
   import { onMount } from "svelte";
   import { isTauri } from "@tauri-apps/api/core";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
-  import { settingsPath } from "./lib/tauri";
+  import { getSettings, saveSettings, settingsPath, type Settings } from "./lib/tauri";
+  import LanguageSettings from "./LanguageSettings.svelte";
 
   // Settings view of the panel (not a separate window). The version is passed
   // down from App so this view doesn't re-fetch it.
   //
-  // P0-003 laid out the section structure (PRD §10.6); the interactive content
-  // of each section is filled by later tasks: Languages (P0-006), Shortcuts
-  // (P0-007), Providers & Models (P0-009), Output/Privacy (P0-017), and
-  // Updates/About (P0-018). P0-004 adds the config-file location below.
+  // This component owns the loaded `settings` object and a `persist()` that
+  // saves it; section components (Languages, and later Shortcuts/Providers/…)
+  // mutate `settings` and call `persist`. P0-003 laid out the section shells;
+  // P0-006 fills Languages. Shortcuts (P0-007), Providers & Models (P0-009),
+  // Output/Privacy (P0-017), and Updates/About (P0-018) follow.
   let { version = "—" }: { version?: string } = $props();
 
   let configPath = $state<string | null>(null);
+  let settings = $state<Settings | null>(null);
+  let saveError = $state<string | null>(null);
 
   onMount(async () => {
     if (!isTauri()) return;
+    try {
+      settings = await getSettings();
+    } catch (e) {
+      saveError = `Could not load settings: ${e}`;
+    }
     try {
       configPath = await settingsPath();
     } catch {
       configPath = null;
     }
   });
+
+  async function persist() {
+    if (!settings) return;
+    try {
+      await saveSettings(settings);
+      saveError = null;
+    } catch (e) {
+      saveError = `Could not save settings: ${e}`;
+    }
+  }
 
   async function reveal() {
     if (!configPath) return;
@@ -37,10 +56,18 @@
 </script>
 
 <section class="body">
-  <div class="section">
-    <h2 class="section__title">Languages</h2>
-    <p class="hint">Primary, secondary, and additional target languages.</p>
-  </div>
+  {#if saveError}
+    <p class="error">{saveError}</p>
+  {/if}
+
+  {#if settings}
+    <LanguageSettings {settings} onChange={persist} />
+  {:else}
+    <div class="section">
+      <h2 class="section__title">Languages</h2>
+      <p class="hint">Loading…</p>
+    </div>
+  {/if}
 
   <div class="section">
     <h2 class="section__title">Shortcuts</h2>
