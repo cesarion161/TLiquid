@@ -22,7 +22,12 @@ blocked
 in-review
 done
 cancelled
+dismissed
 ```
+
+`dismissed` = intentionally deprioritized by the owner; the row is kept (not deleted) and
+the phase may complete without it. Distinct from `cancelled` (abandoned) — a dismissed task
+may be revisited later.
 
 When an agent starts a task, it must update:
 
@@ -139,14 +144,38 @@ Goal: improve the macOS product after MVP, add startup behavior, configurable sh
 |---|---|---|---|---|---|---|---|---|---|
 | P1-001 | Implement startup-on-login for macOS | Phase 1 | FR-053, FR-054, FR-055 | not-started |  |  |  | User can enable/disable launch at login; default onboarding offers ON behavior with clear consent; setting persists; app launches into menu-bar mode. | Use Tauri/plugin or macOS-native mechanism. |
 | P1-002 | Implement configurable shortcuts | Phase 1 | FR-032, FR-033, FR-034 | not-started |  |  |  | User can change the primary (translate-selection) and secondary shortcuts, and optional additional-language shortcuts; conflicts are detected; invalid shortcuts are rejected; settings persist. | Include reset-to-default action. The open-panel hotkey was removed post-Phase-0 (panel opens via the tray); see §3a. |
-| P1-003 | Implement configurable output behavior | Phase 1 | FR-016, FR-017, FR-018 | not-started |  |  |  | User can choose show panel and/or copy to clipboard automatically; replace-selection option is either safely implemented or explicitly hidden/experimental; defaults remain safe. | Replacing selected text must not be default. |
+| P1-003 | Implement configurable output behavior | Phase 1 | FR-016, FR-017, FR-018 | dismissed |  |  |  | User can choose show panel and/or copy to clipboard automatically; replace-selection option is either safely implemented or explicitly hidden/experimental; defaults remain safe. | Replacing selected text must not be default. — **Dismissed 2026-05-27** (owner): current show-panel + Enter-to-copy behavior is satisfactory; not pursuing configurable output. Row kept; revisit only if needed. Phase 1 can complete without it. |
 | P1-004 | Add Ollama/local model support | Phase 1 | FR-039, FR-043 | not-started |  |  |  | User can configure local Ollama endpoint; available models can be listed or manually configured; translation works without cloud provider key; errors are clear when Ollama is unavailable. | Keep provider abstraction unchanged. |
-| P1-005 | Implement macOS right-click integration | Phase 1 | Right-click plan, FR-012, FR-013 | not-started |  |  |  | macOS selected text can be sent to TLiquid through Services or equivalent right-click/native mechanism; user can translate through contextual action where macOS supports it; hotkey remains primary fallback. | Do not block core flow on this. |
-| P1-006 | Improve macOS selected-text capture reliability | Phase 1 | FR-012, FR-013, FR-018 | not-started |  |  |  | Capture works across a wider set of macOS apps; clipboard restoration is more robust; permission detection is improved; failure diagnostics are clearer. | Add app compatibility notes. |
+| P1-005 | Implement macOS right-click integration | Phase 1 | Right-click plan, FR-012, FR-013 | dismissed |  |  |  | macOS selected text can be sent to TLiquid through Services or equivalent right-click/native mechanism; user can translate through contextual action where macOS supports it; hotkey remains primary fallback. | Do not block core flow on this. — **Dismissed 2026-05-27** (owner): the hotkey flow works well; right-click/Services integration not needed. Row kept; revisit only if needed. Phase 1 can complete without it. |
+| P1-006 | Improve macOS selected-text capture reliability | Phase 1 | FR-012, FR-013, FR-018 | dismissed |  |  |  | Capture works across a wider set of macOS apps; clipboard restoration is more robust; permission detection is improved; failure diagnostics are clearer. | Add app compatibility notes. — **Dismissed 2026-05-27** (owner): the P0 clipboard-probe + poll capture already works well across apps (incl. Terminal); no further reliability work needed now. Row kept; revisit only if needed. Phase 1 can complete without it. |
 | P1-007 | Improve local diagnostics export | Phase 1 | FR-065, FR-067 | not-started |  |  |  | User can export local diagnostics bundle that excludes API keys, translations, clipboard contents, prompts, and provider responses; bundle includes version, OS, settings metadata, logs, and recent error categories. | User manually sends/export diagnostics; no automatic upload. |
 | P1-008 | Improve macOS packaging, signing, and notarization | Phase 1 | FR-073, FR-074, FR-075 | not-started |  |  |  | Official macOS build process is documented; signing/notarization implemented if credentials exist; installer UX improved. | Can remain partially blocked by Apple developer account. |
 | P1-009 | Add streaming translation output | Phase 1 | FR-014, FR-015, FR-018 | not-started |  |  |  | Provider adapters stream partial output (SSE for OpenAI/Anthropic/Gemini/OpenRouter, NDJSON for Ollama); deltas are surfaced incrementally in the panel via a Tauri channel; `supports_streaming()` is true for capable providers; the non-streaming path remains a fallback; Enter-to-copy still works on the completed text. | Deferred from Phase 0 (PRD §24 #1). Builds on P0-008/P0-010. Use the `reqwest` `stream` feature + an SSE parser; still no provider SDKs. |
-| P1-010 | Phase 1 QA and release candidate | Phase 1 | All Phase 1 FRs | not-started |  |  |  | Fresh macOS install validates startup, custom shortcuts, Ollama/local models, output behavior, streaming output, right-click integration where available, and improved capture behavior. | Should be done after other Phase 1 tasks. |
+| P1-010 | Phase 1 QA and release candidate | Phase 1 | All Phase 1 FRs | not-started |  |  |  | Fresh macOS install validates startup, custom shortcuts, Ollama/local models, output behavior, streaming output, right-click integration where available, and improved capture behavior. | Should be done after other Phase 1 tasks. **Note (2026-05-27):** P1-003 (output behavior), P1-005 (right-click), and P1-006 (capture reliability) are dismissed — they no longer gate Phase 1 sign-off. QA scope = P1-001 startup-on-login, P1-002 configurable shortcuts, P1-004 Ollama, P1-008 signing/packaging, P1-009 streaming. |
+
+### Phase 1 execution order
+
+Owner-approved sequencing (2026-05-27): do the highest-leverage tasks first. **All six
+remaining tasks are required for Phase 1 to be considered complete** — P1-003, P1-005, and
+P1-006 are `dismissed` and excluded, but nothing else is optional.
+
+```text
+1. P1-008  Signing / notarization / packaging   ← highest leverage: unblocks real
+                                                   distribution; carries the deferred P0
+                                                   signing work.
+2. P1-009  Streaming translation output          ← high UX value; builds on the P0-008/
+                                                   P0-010 provider abstraction.
+3. P1-004  Ollama / local model support          ← also builds on the provider abstraction
+                                                   (group with P1-009 — both touch providers).
+4. P1-002  Configurable shortcuts                ← self-contained settings feature.
+5. P1-001  Launch-at-login                       ← self-contained settings feature.
+  ↓
+6. P1-010  Phase 1 QA / release candidate        ← last; validates the five above.
+```
+
+Rationale: P1-008 and the two provider tasks (P1-009, P1-004) are the highest-leverage work
+and share the provider/build surfaces, so they go first; the two self-contained settings
+features (P1-002, P1-001) can follow or run in parallel; QA (P1-010) closes the phase.
 
 ---
 
