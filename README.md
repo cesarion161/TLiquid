@@ -181,9 +181,9 @@ language is always used; **Auto** applies the primary/secondary rules
   copy and dismiss the panel.
 - **Selected text (⌘⇧T):** select text in any app and press the hotkey — TLiquid
   translates it to the current **Target**, opens prefilled, and shows the result;
-  press **Enter** to copy and dismiss. If **nothing is selected, it does nothing**
-  (no panel). If Accessibility permission isn't granted, it opens with guidance to
-  enable it.
+  press **Enter** to copy and dismiss. If **nothing is selected, the panel opens
+  empty** so you can type/paste and translate manually. If Accessibility permission
+  isn't granted, it opens with guidance to enable it.
 - **Translate to secondary (⌘⇧⌥T):** translates the selection to your secondary
   language (and sets the Target to it). If no secondary is configured, the panel
   opens to **Settings** (Languages is at the top).
@@ -298,10 +298,11 @@ translation and is disclosed here intentionally.
 
 ## Troubleshooting
 
-- **Nothing happens on the hotkey:** if text *is* selected, that's the intended
-  no-op only when nothing is selected — otherwise grant **Accessibility** permission
-  (System Settings → Privacy & Security → Accessibility; the error offers a one-click
-  button). Make sure the app supports Copy; use the manual panel as a fallback.
+- **The hotkey opens the panel but doesn't translate:** if nothing is selected the
+  panel opens empty (by design) — type/paste to translate. If text *is* selected but
+  capture fails, grant **Accessibility** permission (System Settings → Privacy &
+  Security → Accessibility; the error offers a one-click button). Make sure the app
+  supports Copy; use the manual panel as a fallback.
 - **It keeps asking for Accessibility even though TLiquid is enabled in the list:**
   the entry is stale from a previous build — **remove it (select it, press “−”) and
   re-grant**. Unsigned builds get a new identity each rebuild (see "Signing" above).

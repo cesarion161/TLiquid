@@ -223,7 +223,7 @@
       : "Set shortcut"}
   >
     {#if recording === slot}
-      Press keys… (Esc)
+      ⌘⌥⌃⇧ + key (Esc)
     {:else if accel}
       {pretty(accel)}
     {:else}
@@ -243,6 +243,12 @@
     />
     <span class="grow">Enable global keyboard shortcuts</span>
   </label>
+
+  <p class="hint">
+    Click a shortcut, then press your combination. A shortcut is one or more
+    modifiers (⌘ ⌥ ⌃ ⇧) plus a single key — two letters/digits (like T then 1)
+    isn't a valid global shortcut on macOS.
+  </p>
 
   <div class="row">
     <span class="grow" class:hint={!settings.shortcuts.enabled}>Translate selection</span>

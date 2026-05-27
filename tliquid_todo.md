@@ -112,9 +112,10 @@ current intended behavior:
 
 - **Hotkeys simplified to two.** Removed the open-panel hotkey (⌘⌥T); the panel is
   opened manually by clicking the tray icon. ⌘⇧T = translate selection, ⌘⇧⌥T =
-  translate to secondary. The hotkey captures first: **no selection → silent no-op**
-  (no panel); **no Accessibility permission → panel + guidance** (the two are
-  distinguished via `Enigo::new` returning `NoPermission`); selection → translate.
+  translate to secondary. The hotkey captures first: **no selection → panel opens
+  empty** for manual typing (changed 2026-05-27 from the earlier silent no-op);
+  **no Accessibility permission → panel + guidance** (the two are distinguished via
+  `Enigo::new` returning `NoPermission`); selection → translate.
   Dropped `shortcuts.open_manual_popup` from config/UI/types.
 - **Target selector is sticky.** Hotkey + manual translation both honor the Target
   dropdown; the primary/secondary auto-routing rules apply only when Target = "Auto".

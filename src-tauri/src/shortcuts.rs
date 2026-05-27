@@ -171,9 +171,9 @@ fn on_trigger(app: &AppHandle, action: &Action) {
     let (text, error) = match capture::capture_selection(app) {
         capture::Capture::Text(t) => (Some(t), None),
         capture::Capture::Failed(msg) => (None, Some(msg)),
-        // No selection (permission is fine): do nothing — don't even summon the
-        // panel. The user asked for a silent no-op in this case.
-        capture::Capture::NoSelection => return,
+        // No selection (permission is fine): still summon the panel, empty, so
+        // the user can type/paste and translate manually — just no auto-translate.
+        capture::Capture::NoSelection => (None, None),
     };
 
     let _ = windows::show_panel(app);

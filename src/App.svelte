@@ -4,9 +4,10 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { info } from "@tauri-apps/plugin-log";
-  import { appVersion, type Language } from "./lib/tauri";
+  import { appVersion, getSettings, type Language } from "./lib/tauri";
   import Settings from "./Settings.svelte";
   import Translate from "./Translate.svelte";
+  import Notifications from "./Notifications.svelte";
 
   // Esc dismisses the panel (same as clicking outside / losing focus), from any
   // view. Hiding triggers the window's blur handler, which remembers position.
@@ -18,10 +19,10 @@
     }
   }
 
-  // The whole app is one window. Navigation between the translate view and the
-  // Settings view is just a state swap here — no second window. See
-  // src-tauri/src/windows.rs for why TLiquid is single-window.
-  type View = "translate" | "settings";
+  // The whole app is one window. Navigation between the translate view, the
+  // Settings view, and the Notifications view is just a state swap here — no
+  // second window. See src-tauri/src/windows.rs for why TLiquid is single-window.
+  type View = "translate" | "settings" | "notifications";
 
   // A selected-text hotkey delivers the captured text (or a capture error) here;
   // we route to the translate view and hand it to <Translate>. A monotonic `id`
@@ -41,10 +42,17 @@
   let shortcutRequest = $state<ShortcutRequest | null>(null);
   let seq = 0;
 
-  function toggleView() {
-    view = view === "settings" ? "translate" : "settings";
-    // Manual navigation: drop any pending hotkey request so returning to the
-    // translate view doesn't replay an old capture.
+  // Whether the one-time launch-at-login consent has been answered (P1-001).
+  // Until it has, the bell shows a badge and the Notifications view offers it.
+  // Assume answered until settings load so the badge doesn't flash for users
+  // who already responded. Future: also surface new-version alerts here (P2-007).
+  let startupPrompted = $state(true);
+  const notificationCount = $derived(startupPrompted ? 0 : 1);
+
+  // Switch views; manual navigation drops any pending hotkey request so returning
+  // to translate doesn't replay an old capture.
+  function goTo(next: View) {
+    view = next;
     shortcutRequest = null;
   }
 
@@ -68,14 +76,22 @@
       error = String(e);
     }
 
+    // Has the launch-at-login consent been answered? Drives the bell badge.
+    try {
+      const settings = await getSettings();
+      startupPrompted = settings.startup.prompted;
+    } catch {
+      /* leave assumed-answered (no badge) if settings can't load */
+    }
+
     // The tray "Settings…" item asks the panel to switch views.
     await listen<View>("navigate", (event) => {
       view = event.payload;
     });
 
     // A selected-text hotkey summoned the panel (shortcuts.rs) with the captured
-    // selection (or a capture error). It only fires when there's something to act
-    // on — a no-selection press is a silent no-op and never reaches here.
+    // selection, a capture error, or nothing selected (text/error both null →
+    // the panel just opens empty for manual typing). Always routes to translate.
     await listen<{
       action: "primary" | "secondary" | "explicit";
       text: string | null;
@@ -98,16 +114,54 @@
 </script>
 
 <div class="panel">
-  <!-- Frameless window: this slim bar is the drag handle and houses the gear/back. -->
+  <!-- Frameless window: this slim bar is the drag handle and houses the bell +
+       gear (on translate) or a back arrow (on settings/notifications). -->
   <header class="titlebar" data-tauri-drag-region>
-    <button
-      class="icon-btn"
-      title={view === "settings" ? "Back" : "Settings"}
-      aria-label={view === "settings" ? "Back to translate" : "Open settings"}
-      onclick={toggleView}
-    >
-      {view === "settings" ? "←" : "⚙"}
-    </button>
+    {#if view === "translate"}
+      <button
+        class="icon-btn bell"
+        title="Notifications"
+        aria-label={notificationCount > 0
+          ? `Notifications (${notificationCount} new)`
+          : "Notifications"}
+        onclick={() => goTo("notifications")}
+      >
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        {#if notificationCount > 0}
+          <span class="bell-dot" aria-hidden="true"></span>
+        {/if}
+      </button>
+      <button
+        class="icon-btn"
+        title="Settings"
+        aria-label="Open settings"
+        onclick={() => goTo("settings")}
+      >
+        ⚙
+      </button>
+    {:else}
+      <button
+        class="icon-btn"
+        title="Back"
+        aria-label="Back to translate"
+        onclick={() => goTo("translate")}
+      >
+        ←
+      </button>
+    {/if}
   </header>
 
   {#if error}
@@ -123,12 +177,30 @@
       hidden={view !== "translate"}
       active={view === "translate"}
       request={shortcutRequest}
-      onOpenSettings={() => {
-        view = "settings";
-        // Drop the handled request so returning to translate doesn't bounce back.
-        shortcutRequest = null;
-      }}
+      onOpenSettings={() => goTo("settings")}
     />
     <Settings {version} hidden={view !== "settings"} />
+    <Notifications
+      hidden={view !== "notifications"}
+      {startupPrompted}
+      onAnswered={() => (startupPrompted = true)}
+    />
   {/if}
 </div>
+
+<style>
+  /* Unread badge on the notification bell. */
+  .bell {
+    position: relative;
+  }
+  .bell-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--tl-accent);
+    border: 1px solid var(--tl-surface);
+  }
+</style>
