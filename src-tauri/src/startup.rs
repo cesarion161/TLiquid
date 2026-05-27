@@ -4,6 +4,10 @@
 //! The user's intent lives in `config::Settings.startup.enabled`; this applies
 //! it to the OS. The app always starts into menu-bar/Accessory mode (lib.rs), so
 //! a login launch is silent — no window, just the tray icon.
+//!
+//! Note: the LaunchAgent registers the current executable path, so in
+//! `pnpm tauri dev` it points at the dev binary; a real login launch is meant
+//! for the installed `.app` from a release build.
 
 use tauri::AppHandle;
 

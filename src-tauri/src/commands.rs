@@ -23,7 +23,13 @@ pub fn get_settings(app: AppHandle) -> Settings {
 }
 
 #[tauri::command]
-pub fn save_settings(app: AppHandle, settings: Settings) -> Result<()> {
+pub fn save_settings(app: AppHandle, mut settings: Settings) -> Result<()> {
+    // `startup` (launch-at-login + its one-time consent) is server-authoritative:
+    // it is changed only via `set_launch_at_login`. The translate view and the
+    // settings view each hold their own loaded `Settings`, so a full-object save
+    // from a possibly-stale copy must NOT overwrite startup, or it could undo a
+    // just-made launch-at-login choice (P1-001). Preserve the on-disk value.
+    settings.startup = config::load(&app).startup;
     config::save(&app, &settings)
 }
 
@@ -88,10 +94,17 @@ pub fn diagnostics(app: AppHandle) -> String {
     diagnostics::collect(&app).to_report()
 }
 
-/// Enable/disable launching TLiquid at login (P1-001, FR-053/055). The caller
-/// also persists `settings.startup.enabled`; this applies it to the OS.
+/// Enable/disable launching TLiquid at login (P1-001, FR-053/054/055). This is
+/// the single authoritative path for the `startup` setting: it persists the
+/// intent (`enabled` + marks the one-time consent `prompted`) and applies it to
+/// the OS, so neither the consent banner nor the toggle has to round-trip a
+/// full (possibly stale) settings object.
 #[tauri::command]
 pub fn set_launch_at_login(app: AppHandle, enabled: bool) -> Result<()> {
+    let mut settings = config::load(&app);
+    settings.startup.enabled = enabled;
+    settings.startup.prompted = true;
+    config::save(&app, &settings)?;
     startup::set_enabled(&app, enabled)
 }
 

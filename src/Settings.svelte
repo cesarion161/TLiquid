@@ -94,7 +94,7 @@
   {#if settings}
     <ShortcutSettings {settings} onChange={persist} {hidden} />
     <ProviderSettings {settings} onChange={persist} />
-    <StartupSettings {settings} onChange={persist} />
+    <StartupSettings {settings} />
   {/if}
 
   <div class="section">

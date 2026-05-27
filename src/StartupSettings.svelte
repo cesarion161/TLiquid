@@ -1,27 +1,24 @@
 <script lang="ts">
   // Startup section of Settings (P1-001, FR-053/054/055). A single toggle:
-  // launch TLiquid at login. The setting is persisted (config), and applied to
-  // the OS via the autostart command; toggling it also marks the one-time
-  // consent as shown so the first-run prompt won't reappear.
+  // launch TLiquid at login. `startup` is server-authoritative — `setLaunchAtLogin`
+  // persists it (enabled + the one-time consent) and applies it to the OS — so
+  // this view never round-trips its (separate) settings copy for startup; it
+  // only mutates `settings.startup` locally for display.
   import { onMount } from "svelte";
   import { isTauri } from "@tauri-apps/api/core";
   import { setLaunchAtLogin, isLaunchAtLogin, type Settings } from "./lib/tauri";
 
-  let { settings, onChange }: { settings: Settings; onChange: () => void } =
-    $props();
+  let { settings }: { settings: Settings } = $props();
 
   let error = $state<string | null>(null);
 
   onMount(async () => {
     if (!isTauri()) return;
-    // Reflect the real OS registration in case it drifted from the stored
-    // setting (e.g. a hand-edited file, or a failed reconcile).
+    // Reflect the real OS registration for an accurate toggle (this view's
+    // settings copy can be stale, e.g. after consenting on the translate view).
+    // Display-only: no persist — startup is owned by setLaunchAtLogin.
     try {
-      const real = await isLaunchAtLogin();
-      if (real !== settings.startup.enabled) {
-        settings.startup.enabled = real;
-        onChange();
-      }
+      settings.startup.enabled = await isLaunchAtLogin();
     } catch {
       /* fall back to the stored value */
     }
@@ -29,16 +26,12 @@
 
   async function toggle(e: Event) {
     const enabled = (e.currentTarget as HTMLInputElement).checked;
-    settings.startup.enabled = enabled;
-    settings.startup.prompted = true; // engaging the toggle counts as consent
     error = null;
-    onChange();
+    settings.startup.enabled = enabled; // optimistic; command persists it
     try {
       await setLaunchAtLogin(enabled);
     } catch (err) {
-      // Revert the UI if the OS rejected the change.
-      settings.startup.enabled = !enabled;
-      onChange();
+      settings.startup.enabled = !enabled; // revert if the OS rejected it
       error = `Could not change launch-at-login: ${err}`;
     }
   }

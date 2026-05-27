@@ -9,7 +9,6 @@
   import { writeText } from "@tauri-apps/plugin-clipboard-manager";
   import {
     getSettings,
-    saveSettings,
     translate as runTranslate,
     translateStream,
     listProviders,
@@ -80,10 +79,12 @@
 
   async function answerStartupConsent(enable: boolean) {
     if (!settings) return;
+    // Optimistically reflect the choice so the banner hides immediately; the
+    // command persists startup (enabled + prompted) server-side, so we don't
+    // round-trip our (separate) settings copy.
     settings.startup.enabled = enable;
     settings.startup.prompted = true; // never ask again
     try {
-      await saveSettings(settings);
       await setLaunchAtLogin(enable);
     } catch {
       /* best-effort; the toggle in Settings → Startup can fix it later */
