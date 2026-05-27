@@ -178,21 +178,28 @@ pub fn all() -> Vec<ProviderMeta> {
 #[cfg(test)]
 mod privacy_tests {
     //! Privacy invariant (P0-017; FR-019/FR-020/FR-064/FR-067): TLiquid has no
-    //! server of its own. The only network calls are direct BYOK requests to the
+    //! server of its own. Our `reqwest` calls are all direct BYOK requests to the
     //! user's chosen provider. Two guards here:
-    //!  1. `http_client_is_confined_to_the_provider_layer` — the `reqwest` client
-    //!     appears only under `src/providers/`, so this module IS the whole HTTP
-    //!     surface (nothing in `commands`/`lib`/etc. can make a network call).
+    //!  1. `http_client_is_confined_to_the_provider_layer` — our `reqwest` client
+    //!     appears only under `src/providers/`, so this module IS our whole HTTP
+    //!     surface (nothing in `commands`/`lib`/etc. makes its own `reqwest` call).
     //!  2. `provider_layer_only_contacts_allowed_hosts` — within that surface,
     //!     every host literal is a known provider or local endpoint, never a
     //!     TLiquid/telemetry URL.
+    //!
+    //! The one other intentional network call is the **update check** (P2-007 /
+    //! P2-013): the Tauri updater plugin fetches `latest.json` from GitHub
+    //! Releases (see `tauri.conf.json` + `updater.rs`). It contacts only GitHub,
+    //! sends no user data, is check-only, and is opt-out (Settings → Updates). It
+    //! is a separate surface (the plugin's own client, not our `reqwest`), so it
+    //! does not weaken the two guards above.
     //!
     //! Privacy checklist for changes anywhere in the app:
     //! - Adding a provider? add its API host to `ALLOWED_HOSTS` below.
     //! - Never send translation text, prompts, provider responses, clipboard
     //!   contents, or API keys to a TLiquid/analytics endpoint — there is none.
-    //! - No telemetry, analytics, or automatic update-check network calls (and no
-    //!   such dependencies in Cargo.toml).
+    //! - No telemetry or analytics network calls. The only automatic call is the
+    //!   disclosed, opt-out, GitHub-only update check (P2-013, FR-056 exception).
     //! - Keep keys out of logs/errors (guarded by `secrets`/`error`) and out of
     //!   the diagnostics export (guarded by `diagnostics`).
     use std::fs;
