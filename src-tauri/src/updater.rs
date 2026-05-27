@@ -11,13 +11,26 @@
 //! §22.6). Both the manual flow (P2-007) and the background poll (P2-013) call
 //! [`check`]; only the user-initiated path calls [`download_and_install`].
 
+use crate::config;
 use crate::error::{AppError, Result};
 use serde::Serialize;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
+
+/// Event emitted to the panel when a background check finds a newer version
+/// (P2-013). The frontend listens for it to light the notification bell.
+pub const EVENT_UPDATE_AVAILABLE: &str = "update-available";
+
+/// How often the background poll checks for updates (FR-058). Owner-specified.
+const POLL_INTERVAL: Duration = Duration::from_secs(3 * 60 * 60);
+
+/// Delay before the first background check, so startup isn't slowed and the
+/// network has a moment to come up (FR-059 — "on startup", just not instantly).
+const STARTUP_DELAY: Duration = Duration::from_secs(10);
 
 /// Holds the most recent update found by [`check`] so [`download_and_install`]
 /// can install the exact object without a second network round-trip. `None` when
@@ -122,4 +135,42 @@ pub async fn download_and_install(
         .await
         .map_err(|e| AppError::Update(e.to_string()))?;
     Ok(())
+}
+
+/// Spawn the background auto-update poll (P2-013, FR-058/059). On startup (after
+/// a short delay) and then every [`POLL_INTERVAL`], if `updates.auto_check` is
+/// enabled it runs [`check`] and, when a newer version exists, emits
+/// [`EVENT_UPDATE_AVAILABLE`] to the panel so the bell lights up.
+///
+/// **Check-only:** it never downloads or installs — the user always clicks
+/// "Download & install" (P2-007). The setting is re-read each tick, so toggling
+/// auto-check off in Settings stops the polling without a restart. This is the
+/// disclosed exception to the Phase-0/1 "no automatic update checks" promise
+/// (FR-056); the toggle (default ON) lets users opt out.
+pub fn start_auto_check(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(STARTUP_DELAY).await;
+        loop {
+            // Re-read each tick so an off-toggle takes effect without a restart.
+            if config::load(&app).updates.auto_check {
+                match check(&app).await {
+                    Ok(status) if status.available => {
+                        // Best-effort: a failed emit (panel gone) just means the
+                        // bell isn't lit this tick; the next poll re-emits.
+                        let _ = app.emit_to(
+                            crate::windows::PANEL_LABEL,
+                            EVENT_UPDATE_AVAILABLE,
+                            status,
+                        );
+                    }
+                    Ok(_) => {} // up to date — nothing to surface
+                    // Network/parse errors are expected (offline, no release yet);
+                    // log at warn (no secrets in updater errors) and retry later.
+                    Err(e) => log::warn!("background update check failed: {e}"),
+                }
+            }
+            tokio::time::sleep(POLL_INTERVAL).await;
+        }
+    });
 }

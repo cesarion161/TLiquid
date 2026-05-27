@@ -42,6 +42,11 @@ reqwest = { version = "0.12", features = ["json", "stream"] }
 # in the dependency tree via reqwest/tokio, so this adds no real weight.
 futures-util = "0.3"
 
+# Timer for the background auto-update poll (P2-013). tokio is already in the
+# tree via reqwest; naming it directly (time feature only) lets us sleep between
+# polls on Tauri's async runtime without pulling extra weight.
+tokio = { version = "1", features = ["time"], default-features = false }
+
 # Secure secret storage. `apple-native` maps directly onto the macOS Keychain.
 keyring = { version = "3", features = ["apple-native"] }
 

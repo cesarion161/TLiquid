@@ -23,6 +23,10 @@ pub struct Settings {
     pub output: Output,
     pub history: History,
     pub diagnostics: Diagnostics,
+    /// In-app update preferences (P2-013). Defaulted so settings files written
+    /// before this field still load (FR-049) rather than being treated as corrupt.
+    #[serde(default)]
+    pub updates: Updates,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -137,6 +141,23 @@ pub struct Diagnostics {
     pub enabled: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Updates {
+    /// Automatically poll GitHub for a newer version every few hours and on
+    /// startup (P2-013, FR-058/059). **Default ON.** Check-only — a found update
+    /// never auto-downloads or installs; the user always clicks to install
+    /// (P2-007). Defaulted so older settings files load with auto-check enabled.
+    #[serde(default = "default_true")]
+    pub auto_check: bool,
+}
+
+impl Default for Updates {
+    fn default() -> Self {
+        Updates { auto_check: true }
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Settings {
@@ -182,6 +203,7 @@ impl Default for Settings {
             },
             history: History { enabled: false },
             diagnostics: Diagnostics { enabled: false },
+            updates: Updates::default(),
         }
     }
 }
@@ -324,6 +346,17 @@ mod tests {
         assert_eq!(p.ollama_endpoint(), DEFAULT_OLLAMA_ENDPOINT);
         p.ollama.endpoint = Some("http://10.0.0.2:11434".into());
         assert_eq!(p.ollama_endpoint(), "http://10.0.0.2:11434");
+    }
+
+    #[test]
+    fn settings_without_updates_field_default_to_auto_check_on() {
+        // Forward-compat: a settings file written before P2-013 (no `updates`
+        // key) must load with auto-check ON (FR-058 default), not be treated as
+        // corrupt. We round-trip the default settings minus the `updates` field.
+        let mut value = serde_json::to_value(Settings::default()).unwrap();
+        value.as_object_mut().unwrap().remove("updates");
+        let loaded: Settings = serde_json::from_value(value).unwrap();
+        assert!(loaded.updates.auto_check);
     }
 
     #[test]

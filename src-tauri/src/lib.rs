@@ -112,6 +112,12 @@ pub fn run() {
                 );
             }
 
+            // Start the background auto-update poll (P2-013): checks GitHub on
+            // startup + every few hours when `updates.auto_check` is on (default),
+            // lighting the bell on a found update. Check-only — never installs.
+            #[cfg(desktop)]
+            updater::start_auto_check(app.handle());
+
             // In dev, surface the panel immediately so the UI is visible without
             // clicking the tray. Release stays hidden until summoned.
             #[cfg(debug_assertions)]

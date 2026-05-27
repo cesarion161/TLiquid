@@ -102,6 +102,12 @@
       view = event.payload;
     });
 
+    // The background auto-update poll (P2-013) found a newer version; light the
+    // bell + surface it in Notifications/Updates. Same shape as a manual check.
+    await listen<UpdateStatus>("update-available", (event) => {
+      pendingUpdate = event.payload;
+    });
+
     // A selected-text hotkey summoned the panel (shortcuts.rs) with the captured
     // selection, a capture error, or nothing selected (text/error both null →
     // the panel just opens empty for manual typing). Always routes to translate.
@@ -228,6 +234,7 @@
     <Settings
       {version}
       hidden={view !== "settings"}
+      update={pendingUpdate}
       onUpdateAvailable={(s) => (pendingUpdate = s)}
     />
     <Notifications

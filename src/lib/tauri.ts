@@ -79,6 +79,8 @@ export interface Settings {
   };
   history: { enabled: boolean };
   diagnostics: { enabled: boolean };
+  /** In-app update preferences (P2-013). `autoCheck` defaults ON. */
+  updates: { autoCheck: boolean };
 }
 
 export const appVersion = (): Promise<string> => invoke("app_version");

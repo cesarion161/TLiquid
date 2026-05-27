@@ -277,7 +277,14 @@ A starter GitHub Actions workflow lives in
 
 - **BYOK, local-first:** translation requests go directly from your machine to
   the provider you configure. (PRD FR-020, FR-044)
-- **No telemetry** and **no automatic update checks** in Phase 0.
+- **No telemetry.** TLiquid never sends usage data anywhere.
+- **Update checks** (since Phase 2): by default TLiquid checks GitHub Releases
+  for a newer version on startup and every few hours. This is the *only*
+  automatic network call besides your provider requests; it contacts only
+  GitHub, sends no personal data, and **never auto-downloads or installs** — it
+  just lights the 🔔 bell so you can choose to update. Turn it off in
+  **Settings → Updates** ("Automatically check for new updates"); the manual
+  "Check for updates" button still works either way.
 - **API keys** are stored in the **macOS Keychain**, never in the settings file
   or logs. (FR-050–FR-052)
 - **No translation history** is stored by default.

@@ -31,11 +31,15 @@
   let {
     version = "—",
     hidden = false,
+    // The pending update (from a manual check or the background poll), so the
+    // Updates section shows the install affordance even if found in the background.
+    update = null,
     // Bubbles an update found by the Updates section up to App (lights the bell).
     onUpdateAvailable = () => {},
   }: {
     version?: string;
     hidden?: boolean;
+    update?: UpdateStatus | null;
     onUpdateAvailable?: (status: UpdateStatus | null) => void;
   } = $props();
 
@@ -127,7 +131,7 @@
     {/if}
   </div>
 
-  <AboutSettings {version} {onUpdateAvailable} />
+  <AboutSettings {version} {update} {settings} {onUpdateAvailable} onChange={persist} />
 </section>
 
 <style>
