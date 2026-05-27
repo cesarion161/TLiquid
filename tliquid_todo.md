@@ -182,29 +182,41 @@ features (P1-002, P1-001) can follow or run in parallel; QA (P1-010) closes the 
 
 ## 5. Phase 2 — Windows, hosted cloud, updates, paid mode
 
-Goal: add verified Windows support and introduce hosted cloud features, paid mode, updates, optional diagnostics, and Windows right-click integration.
+Goal: introduce hosted cloud features, paid mode, updates, optional diagnostics, and (originally) Windows.
+
+**Roadmap revision (2026-05-27, owner):** Phase 2 is **macOS-focused** for now —
+the priorities are **in-app updates (P2-007)** and a **modern UI refresh with
+optional translucency (P2-012)**; hosted cloud/paid/diagnostics-backend tasks
+(P2-004/005/006/008) remain future and money/infra-gated. **Windows is deferred
+to Phase 3+** (P2-001/002/003/009 reassigned — no Windows device; macOS-only
+release). **Translation history (P2-010) is postponed indefinitely** (may not be
+done at all).
 
 ### Phase 2 task list
 
 | Task ID | Name | Phase | PRD FRs | Status | Agent ID | Datetime started | Datetime finished | Acceptance criteria | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| P2-001 | Add verified Windows app shell and tray support | Phase 2 | FR-009, FR-076 | not-started |  |  |  | App builds and runs on Windows; tray icon appears; no taskbar item when idle where possible; app can open popup/settings and quit from tray. | Requires Windows test environment. |
-| P2-002 | Add Windows global shortcut and selected-text support | Phase 2 | FR-012, FR-013, FR-028, FR-029, FR-030 | not-started |  |  |  | Primary/secondary/manual shortcuts work on Windows; selected-text capture works in common Windows apps; failures are handled clearly. | Use Windows-specific platform adapter. |
-| P2-003 | Add Windows packaging | Phase 2 | FR-076 | not-started |  |  |  | Windows installer/package is produced; install/run/uninstall instructions exist; release artifact is available. | Signing may be deferred or documented. |
+| P2-001 | Add verified Windows app shell and tray support | Phase 3+ | FR-009, FR-076 | not-started |  |  |  | App builds and runs on Windows; tray icon appears; no taskbar item when idle where possible; app can open popup/settings and quit from tray. | Requires Windows test environment. **Deferred to Phase 3+ (2026-05-27, owner): macOS-only release; no Windows device.** |
+| P2-002 | Add Windows global shortcut and selected-text support | Phase 3+ | FR-012, FR-013, FR-028, FR-029, FR-030 | not-started |  |  |  | Primary/secondary/manual shortcuts work on Windows; selected-text capture works in common Windows apps; failures are handled clearly. | Use Windows-specific platform adapter. **Deferred to Phase 3+ (2026-05-27, owner): no Windows device.** |
+| P2-003 | Add Windows packaging | Phase 3+ | FR-076 | not-started |  |  |  | Windows installer/package is produced; install/run/uninstall instructions exist; release artifact is available. | Signing may be deferred or documented. **Deferred to Phase 3+ (2026-05-27, owner): no Windows device.** |
 | P2-004 | Implement hosted LLM proxy backend | Phase 2 | FR-045, FR-070, FR-071, FR-072 | not-started |  |  |  | Backend accepts authenticated translation requests; routes to LLM provider using TLiquid credentials; returns translation; never exposes provider keys; usage is metered. | Requires backend stack decision. |
 | P2-005 | Implement account, licensing, and cloud mode in app | Phase 2 | FR-070, FR-071, FR-072 | not-started |  |  |  | User can sign in or enter license; app can choose BYOK or hosted mode; hosted mode uses backend proxy; failures fall back cleanly. | Keep BYOK mode unrestricted. |
 | P2-006 | Implement usage metering and billing hooks | Phase 2 | FR-070, FR-071, FR-072 | not-started |  |  |  | Hosted usage records include minimal metadata needed for billing/rate limits; plan limits are enforced; no translation content is stored by default. | Payment provider choice can be separate. |
-| P2-007 | Implement auto-update check and update-now flow | Phase 2 | FR-058, FR-059, FR-060, FR-061, FR-062, FR-063 | not-started |  |  |  | App checks for updates on startup and once per day; settings show update state; user can click Update now; update downloads, verifies, installs, and relaunches. | Must not be silent/forced. |
-| P2-008 | Implement optional anonymous diagnostics backend and client | Phase 2 | FR-066, FR-067 | not-started |  |  |  | Diagnostics are opt-in and OFF by default; client sends only allowed metadata; backend receives/stores diagnostics; forbidden data is excluded by design and tests. | No translation text, clipboard, keys, prompts, responses. |
-| P2-009 | Implement Windows right-click integration | Phase 2 | Right-click plan | not-started |  |  |  | Windows context integration works where technically feasible; selected text can be sent to TLiquid; hotkey remains primary fallback. | May require shell extension. |
-| P2-010 | Add optional translation history MVP | Phase 2 | Phase 2 goals | not-started |  |  |  | If enabled, user can view recent translations; history is OFF by default or explicitly consented; storage mode is local-first unless cloud sync is explicitly enabled. | May be deferred to Phase 3 if scope grows. |
-| P2-011 | Phase 2 QA and release candidate | Phase 2 | All Phase 2 FRs | not-started |  |  |  | macOS remains working; Windows verified; hosted proxy works; updates work; diagnostics opt-in works; BYOK unrestricted mode remains intact. | Requires macOS and Windows testing. |
+| P2-007 | Implement auto-update check and update-now flow | Phase 2 | FR-058, FR-059, FR-060, FR-061, FR-062, FR-063 | not-started |  |  |  | App checks for updates on startup and once per day; settings show update state; user can click Update now; update downloads, verifies, installs, and relaunches. | Must not be silent/forced. **Prioritized next macOS task (2026-05-27).** Recommended mechanism (pending owner confirm): Tauri `updater` plugin → fetches a `latest.json` manifest + a full signed app bundle from **GitHub Releases**, replaces the app in place (no manual `.dmg` reinstall), and relaunches. Full-bundle replace (not binary patches). Uses the updater's **own minisign key** (separate from the deferred Apple Developer cert P1-008), so updates work while unsigned — surface version-available in the notification bell (the placeholder added 2026-05-27). |
+| P2-008 | Implement optional anonymous diagnostics backend and client | Phase 2 | FR-066, FR-067 | not-started |  |  |  | Diagnostics are opt-in and OFF by default; client sends only allowed metadata; backend receives/stores diagnostics; forbidden data is excluded by design and tests. | No translation text, clipboard, keys, prompts, responses. Backend/infra-gated (future). |
+| P2-009 | Implement Windows right-click integration | Phase 3+ | Right-click plan | not-started |  |  |  | Windows context integration works where technically feasible; selected text can be sent to TLiquid; hotkey remains primary fallback. | May require shell extension. **Deferred to Phase 3+ (2026-05-27, owner): no Windows device.** |
+| P2-010 | Add optional translation history MVP | Phase 2 | Phase 2 goals | dismissed |  |  |  | If enabled, user can view recent translations; history is OFF by default or explicitly consented; storage mode is local-first unless cloud sync is explicitly enabled. | May be deferred to Phase 3 if scope grows. **Postponed indefinitely (2026-05-27, owner): unsure whether we'll do it at all; revisit only if validated.** |
+| P2-011 | Phase 2 QA and release candidate | Phase 2 | All Phase 2 FRs | not-started |  |  |  | macOS remains working; updates work; UI refresh works; BYOK unrestricted mode remains intact. | macOS-only QA. **Scope updated (2026-05-27):** Windows deferred to Phase 3+; translation history postponed; hosted proxy/paid/diagnostics-backend are future. Phase 2 QA covers P2-007 (updates) + P2-012 (UI/translucency). |
+| P2-012 | Modernize UI + optional Liquid Glass translucency (macOS) | Phase 2 | FR-046, PRD §19.1/§19.3 | not-started |  |  |  | UI refreshed to feel modern (2026); the panel optionally uses macOS translucency/vibrancy ("Liquid Glass"-style) behind the content; the effect is toggleable and **does not regress performance** (idle CPU/GPU + footprint per §13.1) and respects the system Reduce-Transparency / Reduce-Motion accessibility settings. | New (2026-05-27, owner). macOS vibrancy via Tauri window effects (NSVisualEffectView) — gate behind a setting; verify no idle-render/GPU cost when off; keep contrast/legibility (a11y). |
 
 ---
 
-## 6. Phase 3+ — Linux and advanced features
+## 6. Phase 3+ — Windows, Linux, and advanced features
 
-Goal: add verified Linux support and larger product features such as translation memory, cloud sync, and advanced translation workflows.
+Goal: add verified Windows support (**P2-001/002/003/009, reassigned here
+2026-05-27** — their Phase column reads "Phase 3+"), then verified Linux support,
+plus larger product features such as translation memory, cloud sync, and advanced
+translation workflows.
 
 ### Phase 3+ task list
 
