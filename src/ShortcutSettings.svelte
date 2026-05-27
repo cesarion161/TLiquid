@@ -16,6 +16,7 @@
     validateShortcut,
     type Settings,
   } from "./lib/tauri";
+  import { setRecordingShortcut } from "./lib/recording";
 
   let {
     settings,
@@ -69,7 +70,10 @@
     window.removeEventListener("keydown", onRecordKeydown, true);
     window.removeEventListener("blur", cancelRecording);
     // Never leave shortcuts paused if we unmount mid-recording.
-    if (recording !== null && isTauri()) void applyShortcuts().catch(() => {});
+    if (recording !== null) {
+      setRecordingShortcut(false);
+      if (isTauri()) void applyShortcuts().catch(() => {});
+    }
   });
 
   // Re-register the live shortcuts directly (used to restore them after a
@@ -106,11 +110,14 @@
       }
     }
     recording = slot;
+    // Block cross-section persists from re-registering (un-pausing) shortcuts.
+    setRecordingShortcut(true);
   }
 
   function cancelRecording() {
     if (recording === null) return;
     recording = null;
+    setRecordingShortcut(false);
     recordError = "";
     void reapply(); // restore the live shortcuts
   }
@@ -175,6 +182,7 @@
       if (lang) lang.shortcut = accel;
     }
     recording = null;
+    setRecordingShortcut(false); // recording done — persist may re-register again
     recordError = "";
     await persistAndRefresh(); // save + re-register, surfacing conflicts/failures
   }

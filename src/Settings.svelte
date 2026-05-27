@@ -9,6 +9,7 @@
     applyShortcuts,
     type Settings,
   } from "./lib/tauri";
+  import { isRecordingShortcut } from "./lib/recording";
   import LanguageSettings from "./LanguageSettings.svelte";
   import ShortcutSettings from "./ShortcutSettings.svelte";
   import ProviderSettings from "./ProviderSettings.svelte";
@@ -54,7 +55,10 @@
       // Keep the registered global shortcuts in sync with the saved config —
       // e.g. removing an additional language must drop its hotkey (P1-002). The
       // save is awaited first so the re-register reads the new config (no race).
-      await applyShortcuts();
+      // Skip while a shortcut is being recorded: recording deliberately pauses
+      // the live shortcuts, and a save from another section must not un-pause
+      // them mid-recording (ShortcutSettings re-applies when recording ends).
+      if (!isRecordingShortcut()) await applyShortcuts();
     } catch (e) {
       saveError = `Could not save settings: ${e}`;
     }
