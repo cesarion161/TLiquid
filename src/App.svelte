@@ -12,9 +12,28 @@
   // src-tauri/src/windows.rs for why TLiquid is single-window.
   type View = "translate" | "settings";
 
+  // A selected-text hotkey delivers the captured text (or a capture error) here;
+  // we route to the translate view and hand it to <Translate>. A monotonic `id`
+  // lets the child process each request once (P0-014/P0-015).
+  type ShortcutRequest = {
+    action: "primary" | "secondary";
+    text: string | null;
+    error: string | null;
+    id: number;
+  };
+
   let view = $state<View>("translate");
   let version = $state("…");
   let error = $state<string | null>(null);
+  let shortcutRequest = $state<ShortcutRequest | null>(null);
+  let seq = 0;
+
+  function toggleView() {
+    view = view === "settings" ? "translate" : "settings";
+    // Manual navigation: drop any pending hotkey request so returning to the
+    // translate view doesn't replay an old capture.
+    shortcutRequest = null;
+  }
 
   onMount(async () => {
     // The Tauri runtime is only present inside the app's own webview. Opening
@@ -38,6 +57,22 @@
     await listen<View>("navigate", (event) => {
       view = event.payload;
     });
+
+    // A global shortcut summoned the panel (shortcuts.rs). "open" just shows the
+    // translate view; "primary"/"secondary" carry the captured selection.
+    await listen<{
+      action: "open" | "primary" | "secondary";
+      text: string | null;
+      error: string | null;
+    }>("shortcut", (event) => {
+      const p = event.payload;
+      view = "translate";
+      if (p.action === "open") {
+        shortcutRequest = null;
+      } else {
+        shortcutRequest = { action: p.action, text: p.text, error: p.error, id: ++seq };
+      }
+    });
   });
 </script>
 
@@ -49,7 +84,7 @@
       class="icon-btn"
       title={view === "settings" ? "Back" : "Settings"}
       aria-label={view === "settings" ? "Back to translate" : "Open settings"}
-      onclick={() => (view = view === "settings" ? "translate" : "settings")}
+      onclick={toggleView}
     >
       {view === "settings" ? "←" : "⚙"}
     </button>
@@ -63,7 +98,8 @@
     <Settings {version} />
   {:else}
     <!-- Manual translation surface (PRD §10.4/§10.5). Owns its own state and the
-         real provider call; remounts on each switch back so it re-reads settings. -->
-    <Translate />
+         real provider call; remounts on each switch back so it re-reads settings.
+         `request` carries a selected-text hotkey capture to translate (P0-014/15). -->
+    <Translate request={shortcutRequest} />
   {/if}
 </div>

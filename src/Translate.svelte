@@ -16,7 +16,19 @@
   } from "./lib/tauri";
   import Result from "./Result.svelte";
 
+  // A selected-text hotkey capture handed down from App (P0-014/P0-015). `id`
+  // lets us process each request once; `text` is the captured selection (or
+  // `error` if capture failed). `action` selects the routing mode.
+  type ShortcutRequest = {
+    action: "primary" | "secondary";
+    text: string | null;
+    error: string | null;
+    id: number;
+  };
+  let { request = null }: { request?: ShortcutRequest | null } = $props();
+
   let settings = $state<Settings | null>(null);
+  let settingsPromise: Promise<Settings> | null = null;
   let sourceText = $state("");
   let targetValue = $state("auto"); // "auto" (primary routing) or a language code
   let translating = $state(false);
@@ -50,33 +62,46 @@
   });
 
   onMount(async () => {
-    if (isTauri()) {
-      try {
-        settings = await getSettings();
-      } catch (e) {
-        error = `Could not load settings: ${e}`;
-      }
-    }
+    await ensureSettings();
     window.addEventListener("keydown", onWindowKeydown);
   });
 
   onDestroy(() => window.removeEventListener("keydown", onWindowKeydown));
 
-  async function doTranslate() {
-    if (!settings || !ready || !sourceText.trim() || translating) return;
+  // Load settings once (deduped). Awaited by runTranslation so a hotkey request
+  // that arrives before onMount finishes still translates once settings load.
+  async function ensureSettings(): Promise<Settings | null> {
+    if (settings) return settings;
+    if (!isTauri()) return null;
+    if (!settingsPromise) settingsPromise = getSettings();
+    try {
+      settings = await settingsPromise;
+    } catch (e) {
+      error = `Could not load settings: ${e}`;
+    }
+    return settings;
+  }
+
+  // The single translation path used by the manual button and the hotkey flow.
+  async function runTranslation(
+    text: string,
+    mode: RoutingMode,
+    explicit: Language | null,
+  ) {
+    if (translating || !text.trim()) return;
+    const s = await ensureSettings();
+    if (!s?.defaultModel) return; // not ready; the source is prefilled, hint shows
     error = null;
     copied = false;
     output = null;
     translating = true;
     try {
-      const explicit = targets.find((t) => t.value === targetValue)?.lang ?? null;
-      const mode: RoutingMode = targetValue === "auto" ? "primary" : "explicit";
       const resp = await runTranslate({
-        sourceText,
+        sourceText: text,
         routingMode: mode,
         explicitTargetLanguage: explicit,
-        provider: settings.defaultProvider,
-        model: settings.defaultModel!,
+        provider: s.defaultProvider,
+        model: s.defaultModel,
         preserveFormatting: true,
       });
       output = resp.translatedText;
@@ -88,6 +113,39 @@
       translating = false;
     }
   }
+
+  function doTranslate() {
+    const explicit = targets.find((t) => t.value === targetValue)?.lang ?? null;
+    const mode: RoutingMode = targetValue === "auto" ? "primary" : "explicit";
+    runTranslation(sourceText, mode, explicit);
+  }
+
+  // A selected-text hotkey capture arrived: prefill the source and translate
+  // using the action's routing rules (primary or secondary). `handledId` (a
+  // plain, untracked local) ensures each request runs once.
+  let handledId: number | undefined;
+  $effect(() => {
+    const req = request;
+    if (!req || req.id === handledId) return;
+    handledId = req.id;
+    if (req.error) {
+      // Capture failed: show the reason and clear any prior result/source so
+      // stale text doesn't linger under the error.
+      error = req.error;
+      sourceText = "";
+      output = null;
+      copied = false;
+      return;
+    }
+    if (req.text != null) {
+      sourceText = req.text;
+      output = null;
+      copied = false;
+      error = null;
+      const mode: RoutingMode = req.action === "secondary" ? "secondary" : "primary";
+      runTranslation(req.text, mode, null);
+    }
+  });
 
   async function copy() {
     if (!output) return;
