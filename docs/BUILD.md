@@ -121,20 +121,25 @@ xcrun stapler validate src-tauri/target/release/bundle/macos/TLiquid.app
 present**, and otherwise produces an unsigned build — so the workflow works in a
 fork without any Apple account.
 
-Configure these repository **secrets** to enable signing/notarization:
+Configure these repository **secrets** to enable signing/notarization. The
+workflow derives the signing identity *from the certificate* (via
+`security find-identity`), so there is no separate `APPLE_SIGNING_IDENTITY`
+secret to forget:
 
 | Secret | Purpose |
 |---|---|
 | `APPLE_CERTIFICATE` | base64 of your Developer ID `.p12` |
 | `APPLE_CERTIFICATE_PASSWORD` | password for that `.p12` |
-| `APPLE_SIGNING_IDENTITY` | `Developer ID Application: … (TEAMID)` |
 | `KEYCHAIN_PASSWORD` | any string; password for the temp CI keychain |
 | `APPLE_API_ISSUER` / `APPLE_API_KEY` / `APPLE_API_KEY_PATH_B64` | App Store Connect API key for notarization (`_B64` is the base64 of the `.p8`) |
 
-To export the `.p12` to base64 for the secret:
+Signing requires `APPLE_CERTIFICATE` + `APPLE_CERTIFICATE_PASSWORD` +
+`KEYCHAIN_PASSWORD`; notarization additionally needs the three `APPLE_API_*`
+secrets. With none set, the workflow builds unsigned. To export the `.p12` to
+base64 for the secret:
 
 ```bash
-base64 -i Certificates.p12 | pbcopy
+base64 -i certificate.p12 | pbcopy
 ```
 
 ## 6. Status (P1-008)

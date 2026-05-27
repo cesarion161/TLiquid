@@ -32,8 +32,8 @@ cd "$(dirname "$0")/.."
 signing="unsigned"
 if [[ -n "${APPLE_SIGNING_IDENTITY:-}" || -n "${APPLE_CERTIFICATE:-}" ]]; then
 	signing="signed"
-	# A cert with no identity name (or vice versa) silently produces an unsigned
-	# build — catch that misconfiguration here instead of shipping it.
+	# An APPLE_CERTIFICATE without its password can't be imported and silently
+	# degrades to an unsigned build — catch that misconfiguration up front.
 	if [[ -n "${APPLE_CERTIFICATE:-}" && -z "${APPLE_CERTIFICATE_PASSWORD:-}" ]]; then
 		echo "error: APPLE_CERTIFICATE is set but APPLE_CERTIFICATE_PASSWORD is not." >&2
 		exit 1
@@ -41,11 +41,16 @@ if [[ -n "${APPLE_SIGNING_IDENTITY:-}" || -n "${APPLE_CERTIFICATE:-}" ]]; then
 fi
 
 # --- detect notarization state ------------------------------------------------
+# APPLE_API_KEY (key id) and APPLE_API_ISSUER have no fallback, so both are
+# required together. APPLE_API_KEY_PATH is optional: when unset, Tauri
+# auto-discovers the .p8 in ./private_keys, ~/private_keys, ~/.private_keys, or
+# ~/.appstoreconnect/private_keys — so we don't force it here.
 notarize="off"
 if [[ -n "${APPLE_API_KEY:-}" || -n "${APPLE_API_ISSUER:-}" || -n "${APPLE_API_KEY_PATH:-}" ]]; then
-	if [[ -z "${APPLE_API_KEY:-}" || -z "${APPLE_API_ISSUER:-}" || -z "${APPLE_API_KEY_PATH:-}" ]]; then
+	if [[ -z "${APPLE_API_KEY:-}" || -z "${APPLE_API_ISSUER:-}" ]]; then
 		echo "error: incomplete App Store Connect API notarization config." >&2
-		echo "       set all of APPLE_API_KEY, APPLE_API_ISSUER, APPLE_API_KEY_PATH." >&2
+		echo "       set both APPLE_API_KEY and APPLE_API_ISSUER (APPLE_API_KEY_PATH" >&2
+		echo "       is optional — Tauri auto-discovers the .p8 if it is unset)." >&2
 		exit 1
 	fi
 	notarize="api-key"

@@ -42,24 +42,37 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Import the Developer ID certificate into a temporary keychain — only if
-      # the signing secret exists (skipped in forks / unsigned builds).
+      # Import the Developer ID certificate into a temporary keychain and DERIVE
+      # the signing identity from it (no separate APPLE_SIGNING_IDENTITY secret,
+      # so signing can't silently no-op because one secret was forgotten). Runs
+      # only when the cert secret exists — skipped in forks / unsigned builds.
       - name: Import Apple Developer certificate
         if: ${{ env.APPLE_CERTIFICATE != '' }}
         env:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          P12="$RUNNER_TEMP/certificate.p12"
+          # Guarantee the decoded private key is removed even if a step fails.
+          trap 'rm -f "$P12"' EXIT
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$P12"
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
-          security import certificate.p12 -k build.keychain \
+          security import "$P12" -k build.keychain \
             -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          rm certificate.p12
+          # Extract the imported Developer ID Application identity for tauri.
+          CERT_ID=$(security find-identity -v -p codesigning build.keychain \
+            | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+          if [ -z "$CERT_ID" ]; then
+            echo "error: no 'Developer ID Application' identity in the imported certificate." >&2
+            exit 1
+          fi
+          echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> "$GITHUB_ENV"
+          echo "Signing identity: $CERT_ID"
 
       # Materialize the App Store Connect API key file from a base64 secret,
       # again only when present.
@@ -69,11 +82,14 @@ jobs:
           echo "$APPLE_API_KEY_PATH_B64" | base64 --decode > "$RUNNER_TEMP/apple_api_key.p8"
           echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/apple_api_key.p8" >> "$GITHUB_ENV"
 
+      # tauri-action signs when APPLE_SIGNING_IDENTITY is in the env (set by the
+      # import step above) and notarizes when the API-key vars are present; with
+      # neither it builds unsigned. APPLE_SIGNING_IDENTITY / APPLE_API_KEY_PATH
+      # flow in via $GITHUB_ENV from the prior steps.
       - name: Build (and sign/notarize if secrets present)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
         with:
