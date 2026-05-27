@@ -133,6 +133,47 @@ paid Apple Developer account, which this MVP doesn't assume. An unsigned local
 build is acceptable for internal testing — use the Gatekeeper bypass above.
 Producing a signed, notarized release is tracked as **P1-008**.
 
+## Using TLiquid
+
+Click the menu-bar icon to open the panel; click the **⚙ gear** (top-right) to
+open **Settings**. For first-time setup you'll mainly use three of its sections:
+
+1. **Languages** — your **primary** language (English by default) and an optional
+   **secondary**. Add any number of additional target languages; reorder or
+   remove them. (No language cap — it's BYOK.)
+2. **Providers** — paste an API key for **OpenAI**, **Anthropic**, **Gemini**, or
+   **OpenRouter**, then **Save**. Use **Test** to verify the key; the status reads
+   *Configured*, *Connection OK*, or *Invalid key* — or shows the provider error
+   if the connection fails. **Remove** deletes the key from the Keychain.
+3. **Models** — pick the **default provider** (only providers with a saved key are
+   selectable) and a **default model** (fetched live from the provider; if the
+   list can't load you can type a model id manually).
+
+Then translate:
+
+- **Manually:** open the panel, type/paste text, choose a target (*Auto* uses the
+  primary/secondary rules, or pick a specific language), press **Translate** (or
+  Enter). **Copy**, or press **Enter** to copy and dismiss the panel.
+- **Selected text (primary hotkey, ⌘⇧T):** select text in any app and press the
+  hotkey. TLiquid captures the selection, opens prefilled, and translates using
+  the routing rules: non-primary → primary; primary → secondary (or, with no
+  secondary, stays primary). Press **Enter** to copy and dismiss.
+- **Selected text (secondary hotkey, ⌘⇧⌥T):** always translates to the secondary
+  language. If no secondary is set, the panel opens **Settings** (the Languages
+  section is at the top).
+- **Open panel (⌘⌥T):** just summons the panel.
+
+Shortcuts can be toggled off entirely in **Settings → Shortcuts** (custom
+remapping is a later phase).
+
+### How your API keys are stored
+
+Keys are stored in the **macOS Keychain** (service `com.tliquid.app`, one entry
+per provider) — never in the settings file, logs, error messages, or the
+diagnostics export. (FR-050–FR-052) The non-secret settings file lives in the app
+config dir; its exact path and a **Reveal in Finder** button are in
+**Settings → Settings file**.
+
 ## Lint, format & test
 
 ```bash
@@ -155,11 +196,16 @@ A starter GitHub Actions workflow lives in
 ├─ index.html                                  # the one window entry
 ├─ src/                                        # Svelte 5 frontend
 │  ├─ main.ts                                  # mounts the panel
-│  ├─ App.svelte         # the panel: titlebar + view switch (translate/settings)
-│  ├─ Settings.svelte / Result.svelte          # views inside the panel, not windows
+│  ├─ App.svelte          # the panel: titlebar + view switch + hotkey routing
+│  ├─ Translate.svelte    # manual + selected-text translate view
+│  ├─ Result.svelte       # output pane (copy / Enter-to-copy / errors)
+│  ├─ Settings.svelte     # loads settings; hosts the section components
+│  ├─ LanguageSettings.svelte / ShortcutSettings.svelte
+│  ├─ ProviderSettings.svelte / PrivacySettings.svelte / AboutSettings.svelte
 │  └─ lib/
-│     ├─ tauri.ts                              # typed IPC wrappers
-│     └─ styles.css
+│     ├─ tauri.ts                              # typed IPC wrappers (the only invoke site)
+│     ├─ languages.ts                          # selectable language list
+│     └─ styles.css                            # design system
 ├─ src-tauri/                                  # Rust backend
 │  ├─ src/
 │  │  ├─ lib.rs            # builder: plugins, panel, tray, macOS accessory mode
@@ -168,10 +214,13 @@ A starter GitHub Actions workflow lives in
 │  │  ├─ commands.rs      # Tauri commands exposed to the UI
 │  │  ├─ config.rs        # non-secret settings (PRD §16)
 │  │  ├─ secrets.rs       # macOS Keychain storage
+│  │  ├─ shortcuts.rs     # global hotkey registration
+│  │  ├─ capture.rs       # macOS selected-text capture (simulated ⌘C)
 │  │  ├─ languages.rs     # primary/secondary routing engine
 │  │  ├─ translation.rs   # prompt templates + orchestrator
+│  │  ├─ diagnostics.rs   # local diagnostics export (no upload)
 │  │  ├─ error.rs
-│  │  └─ providers/       # OpenAI / Anthropic / Gemini / OpenRouter / Ollama
+│  │  └─ providers/       # http core + OpenAI / Anthropic / Gemini / OpenRouter / Ollama
 │  ├─ capabilities/       # window permissions
 │  └─ tauri.conf.json
 └─ .github/workflows/ci.yml
@@ -189,12 +238,46 @@ A starter GitHub Actions workflow lives in
 Translated text *is* sent to your chosen provider — that is inherent to LLM
 translation and is disclosed here intentionally.
 
+## Known limitations (Phase 0)
+
+- **macOS only.** Windows and Linux are **not verified** targets. The code is
+  kept portable via Tauri, but only macOS behavior is accepted (PRD §3.1).
+- **Selected-text capture** simulates ⌘C, so it requires Accessibility permission
+  and works only in apps that respond to Copy. It briefly uses the clipboard and
+  restores the previous **text**; non-text clipboard contents (e.g. an image)
+  can't be preserved. A selection identical to the current clipboard reads as
+  "no selection."
+- **Unsigned build** — see the Gatekeeper bypass above.
+- **Non-streaming.** Translations appear all at once when the provider responds
+  (streaming output is a Phase 1 goal).
+- **Local models (Ollama)** are not available yet (Phase 1).
+- The result's target-language label is best-effort in Auto/primary mode (the
+  model picks the real target from the detected source).
+
+## Troubleshooting
+
+- **Nothing happens on the hotkey / "No text was captured":** grant **Accessibility**
+  permission (System Settings → Privacy & Security → Accessibility); the app's
+  error offers a one-click button to that pane. Make sure text is actually
+  selected and the app supports Copy. Use the manual panel as a fallback.
+- **"Invalid key" or a connection error:** re-check the key in Settings → Providers
+  and **Test** it; confirm network access and that the provider/model is available.
+- **No models to choose / list won't load:** the provider's model API may be
+  unavailable — type the model id manually in Settings → Models, or **Retry**.
+- **App won't open ("Apple cannot check it…"):** right-click → Open, or
+  `xattr -dr com.apple.quarantine /Applications/TLiquid.app` (unsigned build).
+- **"Not running inside the TLiquid app":** you opened the dev URL in a browser —
+  use the window `pnpm tauri dev` opens instead.
+- **Bug reports:** Settings → Privacy → **Copy diagnostics** copies a local,
+  non-sensitive summary (no keys or text) to paste into an issue.
+
 ## Status
 
-Phase 0 foundation (**task P0-001**) is in place: the app builds and runs as a
-macOS menu-bar utility with the full dependency set, module skeleton, and IPC
-surface wired. Feature epics (settings UI, providers, selected-text capture,
-hotkeys) follow per [`tliquid_todo.md`](./tliquid_todo.md).
+Phase 0 (macOS MVP) is feature-complete: menu-bar shell, settings (languages,
+shortcuts, providers/models, privacy/about), secure key storage, manual and
+selected-text translation against real BYOK providers, copy/Enter behavior, and
+an installable `.app`. Remaining work is end-to-end QA (**P0-021**) and signing
+(**P1-008**). Epic-by-epic status is tracked in [`tliquid_todo.md`](./tliquid_todo.md).
 
 ## License
 
