@@ -166,9 +166,12 @@
     handleRequest(req);
   });
 
-  // Prefill the source and translate per the action's routing rules. For the
-  // secondary hotkey with no secondary language configured, redirect to Settings
-  // instead of erroring (PRD §10.3).
+  // Prefill the source from a selected-text hotkey and translate to the current
+  // Target. The Target dropdown is the sticky session choice: an explicit
+  // language is always honored; only "Auto" applies the primary/secondary rules.
+  // The primary hotkey keeps whatever Target is selected; the secondary hotkey
+  // switches the Target to the secondary language (redirecting to Settings if
+  // none is configured, PRD §10.3).
   async function handleRequest(req: ShortcutRequest) {
     if (req.error) {
       // Capture failed: show the reason (with the Accessibility shortcut) and
@@ -182,20 +185,22 @@
     }
     if (req.text == null) return;
 
+    const s = await ensureSettings(); // load settings so `targets` is complete
+
     if (req.action === "secondary") {
-      const s = await ensureSettings();
       if (s && !s.languages.secondary) {
         onOpenSettings?.();
         return;
       }
+      if (s?.languages.secondary) targetValue = s.languages.secondary.code;
     }
 
     sourceText = req.text;
     output = null;
     copied = false;
     error = null;
-    const mode: RoutingMode = req.action === "secondary" ? "secondary" : "primary";
-    runTranslation(req.text, mode, null);
+    permissionHelp = false;
+    doTranslate(); // translate to the current Target (Auto → routing rules)
   }
 
   async function copy() {
