@@ -7,6 +7,7 @@
   import ShortcutSettings from "./ShortcutSettings.svelte";
   import ProviderSettings from "./ProviderSettings.svelte";
   import PrivacySettings from "./PrivacySettings.svelte";
+  import AboutSettings from "./AboutSettings.svelte";
 
   // Settings view of the panel (not a separate window). The version is passed
   // down from App so this view doesn't re-fetch it.
@@ -85,11 +86,6 @@
   <PrivacySettings />
 
   <div class="section">
-    <h2 class="section__title">Updates</h2>
-    <p class="hint">Automatic updates are not enabled in Phase 0.</p>
-  </div>
-
-  <div class="section">
     <h2 class="section__title">Settings file</h2>
     <p class="hint">
       Advanced non-secret settings can be edited here. API keys are stored
@@ -103,10 +99,7 @@
     {/if}
   </div>
 
-  <div class="section">
-    <h2 class="section__title">About</h2>
-    <p class="hint">TLiquid v{version}</p>
-  </div>
+  <AboutSettings {version} />
 </section>
 
 <style>
