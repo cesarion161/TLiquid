@@ -147,3 +147,122 @@ pub fn all() -> Vec<ProviderMeta> {
     })
     .collect()
 }
+
+#[cfg(test)]
+mod privacy_tests {
+    //! Privacy invariant (P0-017; FR-019/FR-020/FR-064/FR-067): TLiquid has no
+    //! server of its own. The only network calls are direct BYOK requests to the
+    //! user's chosen provider. Two guards here:
+    //!  1. `http_client_is_confined_to_the_provider_layer` — the `reqwest` client
+    //!     appears only under `src/providers/`, so this module IS the whole HTTP
+    //!     surface (nothing in `commands`/`lib`/etc. can make a network call).
+    //!  2. `provider_layer_only_contacts_allowed_hosts` — within that surface,
+    //!     every host literal is a known provider or local endpoint, never a
+    //!     TLiquid/telemetry URL.
+    //!
+    //! Privacy checklist for changes anywhere in the app:
+    //! - Adding a provider? add its API host to `ALLOWED_HOSTS` below.
+    //! - Never send translation text, prompts, provider responses, clipboard
+    //!   contents, or API keys to a TLiquid/analytics endpoint — there is none.
+    //! - No telemetry, analytics, or automatic update-check network calls (and no
+    //!   such dependencies in Cargo.toml).
+    //! - Keep keys out of logs/errors (guarded by `secrets`/`error`) and out of
+    //!   the diagnostics export (guarded by `diagnostics`).
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    /// Collect every `.rs` file under `dir`, recursively.
+    fn rs_files(dir: &Path, out: &mut Vec<PathBuf>) {
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                rs_files(&path, out);
+            } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+                out.push(path);
+            }
+        }
+    }
+
+    #[test]
+    fn http_client_is_confined_to_the_provider_layer() {
+        // If `reqwest` is referenced outside `src/providers/`, the audited HTTP
+        // surface has leaked — fail so a stray network call is caught.
+        let src = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src"));
+        let mut files = Vec::new();
+        rs_files(src, &mut files);
+
+        let mut provider_uses_reqwest = false;
+        for path in &files {
+            let in_providers = path.components().any(|c| c.as_os_str() == "providers");
+            let body = fs::read_to_string(path).unwrap();
+            if in_providers {
+                provider_uses_reqwest |= body.contains("reqwest");
+            } else {
+                assert!(
+                    !body.contains("reqwest"),
+                    "HTTP must stay in the provider layer; found `reqwest` in {path:?}"
+                );
+            }
+        }
+        assert!(
+            provider_uses_reqwest,
+            "expected the provider layer to use reqwest; scan may be broken"
+        );
+    }
+
+    /// Hosts the app is allowed to contact. Provider REST APIs + local (Ollama).
+    const ALLOWED_HOSTS: &[&str] = &[
+        "api.openai.com",
+        "api.anthropic.com",
+        "generativelanguage.googleapis.com",
+        "openrouter.ai",
+        "localhost",
+        "127.0.0.1",
+    ];
+
+    /// Extract the host of every `http(s)://…` URL literal in `src`.
+    fn hosts_in(src: &str) -> Vec<String> {
+        let mut hosts = Vec::new();
+        for scheme in ["https://", "http://"] {
+            let mut rest = src;
+            while let Some(i) = rest.find(scheme) {
+                let after = &rest[i + scheme.len()..];
+                let end = after
+                    .find(|c: char| !(c.is_ascii_alphanumeric() || c == '.' || c == '-'))
+                    .unwrap_or(after.len());
+                if end > 0 {
+                    hosts.push(after[..end].to_string());
+                }
+                rest = &after[end..];
+            }
+        }
+        hosts
+    }
+
+    #[test]
+    fn provider_layer_only_contacts_allowed_hosts() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src/providers");
+        let mut found = Vec::new();
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+                found.extend(hosts_in(&fs::read_to_string(&path).unwrap()));
+            }
+        }
+        // Guard against the scan silently finding nothing (e.g. if it breaks).
+        assert!(
+            found.iter().any(|h| h == "api.openai.com"),
+            "expected to find provider URLs to validate; scan may be broken"
+        );
+        for host in &found {
+            assert!(
+                !host.contains("tliquid"),
+                "the provider layer must never contact a TLiquid host: {host}"
+            );
+            assert!(
+                ALLOWED_HOSTS.contains(&host.as_str()),
+                "unexpected host in the provider layer: {host} (add it to ALLOWED_HOSTS only if it is a real provider/local endpoint)"
+            );
+        }
+    }
+}
