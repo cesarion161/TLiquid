@@ -284,7 +284,7 @@ future, infra-gated), and translation history (P2-010 → postponed).
 | `cargo fmt --check` | ✅ clean |
 | `cargo clippy --all-targets -- -D warnings` | ✅ clean |
 | `cargo test` | ✅ 79 passed, 0 failed (was 78 in Phase 1; +1 updates-back-compat test) |
-| `pnpm tauri build --no-bundle` | ✅ release builds, "Built application" |
+| `pnpm tauri build --no-bundle` | ✅ release **binary** compiles ("Built application"); not launched here (no display — see §3) |
 
 New Phase 2 test coverage: the `updates` settings back-compat default
 (`config::settings_without_updates_field_default_to_auto_check_on`). The existing
