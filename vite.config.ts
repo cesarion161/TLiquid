@@ -29,13 +29,10 @@ export default defineConfig({
     target: "safari15",
     minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
-    // One HTML entry per native window. Each maps to a Tauri WebviewWindow.
+    // Single window (the menu-bar panel) → a single `index.html` entry. Settings
+    // and result are views inside it, not separate windows. See src-tauri/src/windows.rs.
     rollupOptions: {
-      input: {
-        main: resolve(__dirname, "index.html"),
-        settings: resolve(__dirname, "settings.html"),
-        result: resolve(__dirname, "result.html"),
-      },
+      input: { main: resolve(__dirname, "index.html") },
     },
   },
 });

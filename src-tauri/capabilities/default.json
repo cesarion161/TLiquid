@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Core permissions for TLiquid's windows (popup, settings, result).",
-  "windows": ["main", "settings", "result"],
+  "description": "Core permissions for TLiquid's single menu-bar panel window.",
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "opener:default",

@@ -27,13 +27,18 @@ This repository is the **Phase 0 (macOS MVP)** foundation. See
 | -------------- | ------------------------------------------------- |
 | Desktop shell  | [Tauri v2](https://tauri.app)                     |
 | Core language  | Rust                                              |
-| UI             | Svelte 5 + Vite + TypeScript (multi-window SPA)   |
+| UI             | Svelte 5 + Vite + TypeScript (single panel)       |
 | Secrets        | macOS Keychain (`keyring` crate)                  |
 | HTTP           | `reqwest` (system TLS — no OpenSSL)               |
 | Package manager| pnpm                                              |
 
-Each native window (manual popup, settings, result popup) is its own HTML entry
-point built by Vite and opened on demand by the Rust side.
+TLiquid is **one window** — a frameless menu-bar panel that drops down under
+the tray icon, in the spirit of [Raycast](https://raycast.com),
+[Docker Desktop](https://docker.com)'s tray panel, and JetBrains Toolbox. The
+translate input/result and Settings are *views inside that one panel*, not
+separate windows. The panel is created once at startup (hidden), shown/hidden
+on tray click, and floats above other apps — including fullscreen Spaces — so
+it can be summoned from anywhere.
 
 ## Prerequisites
 
@@ -52,9 +57,10 @@ pnpm install
 pnpm tauri dev
 ```
 
-On launch the app installs a **menu-bar icon** and stays out of the Dock. In
-dev builds the main window also opens automatically; in release it stays
-menu-bar-only (open it from the tray).
+On launch the app installs a **menu-bar icon** and stays out of the Dock. The
+panel is created hidden up front so opening it is instant. In dev builds it is
+shown automatically; in release it stays hidden until you click the tray icon
+(or trigger a hotkey).
 
 > **Don't open `http://localhost:1420` in a browser.** The Tauri IPC runtime
 > only exists inside the app's own window — a browser has no `invoke`, so the UI
@@ -95,18 +101,19 @@ A starter GitHub Actions workflow lives in
 
 ```text
 .
-├─ index.html / settings.html / result.html   # one entry per native window
+├─ index.html                                  # the one window entry
 ├─ src/                                        # Svelte 5 frontend
-│  ├─ main.ts / settings.ts / result.ts        # window mount points
-│  ├─ App.svelte / Settings.svelte / Result.svelte
+│  ├─ main.ts                                  # mounts the panel
+│  ├─ App.svelte         # the panel: titlebar + view switch (translate/settings)
+│  ├─ Settings.svelte / Result.svelte          # views inside the panel, not windows
 │  └─ lib/
 │     ├─ tauri.ts                              # typed IPC wrappers
 │     └─ styles.css
 ├─ src-tauri/                                  # Rust backend
 │  ├─ src/
-│  │  ├─ lib.rs            # builder: plugins, tray, macOS accessory mode
-│  │  ├─ tray.rs          # menu-bar shell
-│  │  ├─ windows.rs       # on-demand window creation
+│  │  ├─ lib.rs            # builder: plugins, panel, tray, macOS accessory mode
+│  │  ├─ tray.rs          # menu-bar shell; left-click toggles the panel
+│  │  ├─ windows.rs       # the single panel: create-hidden, show/hide, tray-anchored
 │  │  ├─ commands.rs      # Tauri commands exposed to the UI
 │  │  ├─ config.rs        # non-secret settings (PRD §16)
 │  │  ├─ secrets.rs       # macOS Keychain storage

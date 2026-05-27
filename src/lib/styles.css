@@ -46,8 +46,69 @@ body {
   height: 100%;
 }
 
-main {
-  padding: 20px;
+/* The panel: a frameless menu-bar window with a draggable custom titlebar. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--tl-border);
+  background: var(--tl-surface);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.icon-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--tl-text-muted);
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--tl-bg);
+  color: var(--tl-text);
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.input {
+  width: 100%;
+  min-height: 96px;
+  resize: none;
+  padding: 10px 12px;
+  border: 1px solid var(--tl-border);
+  border-radius: 8px;
+  background: var(--tl-surface);
+  color: var(--tl-text);
+  font: inherit;
+}
+
+.result {
+  flex: 1;
 }
 
 h1 {

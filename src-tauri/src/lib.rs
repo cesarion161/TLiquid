@@ -25,10 +25,11 @@ pub fn run() {
     let builder = tauri::Builder::default();
 
     // Single-instance must be registered first so a second launch is caught
-    // before the rest of the app initializes (FR-004). Desktop only.
+    // before the rest of the app initializes (FR-004). Desktop only. A second
+    // launch just summons the existing panel.
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-        let _ = windows::show_main(app);
+        let _ = windows::show_panel(app, None);
     }));
 
     builder
@@ -38,16 +39,20 @@ pub fn run() {
         .plugin(tauri_plugin_log::Builder::new().build())
         .setup(|app| {
             // macOS: live in the menu bar and stay out of the Dock while idle
-            // (FR-007). The tray icon is the app's primary surface.
+            // (FR-007). Accessory mode also lets the panel float over fullscreen
+            // apps. The tray icon is the app's primary surface.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            // Create the panel once, hidden, so summoning it later is an instant
+            // show rather than a fresh webview load (PRD §13.2).
+            windows::create_panel(app.handle())?;
             tray::create(app.handle())?;
 
-            // In dev, surface the main window immediately so the UI is visible
-            // without clicking the tray. Release stays menu-bar-only.
+            // In dev, surface the panel immediately so the UI is visible without
+            // clicking the tray. Release stays hidden until summoned.
             #[cfg(debug_assertions)]
-            windows::show_main(app.handle())?;
+            windows::show_panel(app.handle(), None)?;
 
             Ok(())
         })

@@ -69,7 +69,7 @@ TLiquid solves this by behaving like a native macOS utility: always available, t
 5. Run in the background.
 6. Avoid occupying normal Dock space while idle where macOS allows this.
 7. Show a persistent macOS menu-bar icon.
-8. Provide a simple menu-bar popup for manual translation.
+8. Provide a simple menu-bar panel for manual translation.
 9. Support selected-text translation from macOS apps using a global hotkey.
 10. Provide primary/secondary language behavior so users rarely need to manually choose a target language.
 11. Support unlimited local BYOK target languages.
@@ -98,6 +98,7 @@ TLiquid solves this by behaving like a native macOS utility: always available, t
 7. Add shortcut conflict detection and remediation.
 8. Improve macOS permissions onboarding.
 9. Improve install/notarization/signing flow where feasible.
+10. Add streaming translation output — provider deltas (SSE for cloud providers, NDJSON for Ollama) surfaced incrementally in the panel. Deferred from Phase 0 (§15.5, §24).
 
 ### 3.3 Phase 2 goals: Windows and hosted cloud
 
@@ -223,8 +224,8 @@ Positioning statement:
 | Svelte UI | Yes | Yes | Yes | Yes |
 | macOS menu-bar background mode | Yes | Improve | Improve | Improve |
 | No Dock presence while idle | Yes, where possible | Improve | Improve | Improve |
-| Manual translation popup | Yes | Improve | Improve | Improve |
-| Global hotkey for manual popup | Yes | Configurable | Configurable | Configurable |
+| Manual translation panel | Yes | Improve | Improve | Improve |
+| Global hotkey for the panel | Yes | Configurable | Configurable | Configurable |
 | Global hotkey for selected text translation | macOS only | Improve | Windows added | Linux added |
 | Primary language | Yes | Improve | Improve | Improve |
 | Secondary language | Yes | Improve | Improve | Improve |
@@ -324,13 +325,13 @@ If secondary language is not configured, TLiquid opens settings or a compact set
 
 ### 9.4 Additional languages
 
-Additional languages are available from settings and optionally from the manual translation popup.
+Additional languages are available from settings and optionally from the translate view in the panel.
 
 Phase 0:
 
 - User can configure unlimited languages.
 - Primary and secondary are the main fast paths.
-- Additional languages can be chosen manually in the popup.
+- Additional languages can be chosen manually in the panel.
 
 Phase 1:
 
@@ -373,7 +374,7 @@ Phase 0 behavior:
 
 Future behavior:
 
-- Optional compact language override in result popup.
+- Optional compact language override in the panel.
 
 ---
 
@@ -398,7 +399,7 @@ On first launch:
 If user skips provider setup:
 
 - App remains installed but translation is disabled.
-- Menu-bar popup shows `Configure provider`.
+- The panel shows `Configure provider`.
 
 ### 10.2 Translate selected text by primary hotkey
 
@@ -413,8 +414,8 @@ Flow:
 1. App captures selected text.
 2. App determines target language using primary/secondary rules.
 3. App sends translation request to configured provider/model.
-4. Result appears in menu-bar-origin popup.
-5. User presses Enter to copy result and close popup.
+4. The panel opens near the tray, prefilled with the source text, and shows the translation.
+5. User presses Enter to copy result and dismiss the panel.
 6. User can also click Copy.
 
 Failure states:
@@ -441,24 +442,24 @@ Flow:
 
 1. App captures selected text.
 2. App translates to configured secondary language.
-3. Result appears in menu-bar-origin popup.
-4. User presses Enter to copy result and close popup.
+3. The panel opens near the tray, prefilled with the source text, and shows the translation.
+4. User presses Enter to copy result and dismiss the panel.
 
 If secondary language is missing:
 
 - App opens settings to language section.
 
-### 10.4 Manual translation popup
+### 10.4 Manual translation in the panel
 
 Trigger:
 
 ```text
 User clicks menu-bar icon
 or
-User presses manual popup shortcut
+User presses manual translation shortcut
 ```
 
-Default manual popup shortcut:
+Default manual translation shortcut:
 
 ```text
 Cmd + Option + T
@@ -466,33 +467,33 @@ Cmd + Option + T
 
 Flow:
 
-1. Small scrollable popup opens from menu bar.
-2. User types or pastes text into input field.
+1. The panel drops down under the tray icon (see §19.2).
+2. User types or pastes text into the input field.
 3. User presses Enter or clicks Translate.
-4. Translation appears below in scrollable output field.
-5. Copy button appears below result.
+4. Translation appears below in a scrollable output field.
+5. Copy button appears below the result.
 6. Label says `Press Enter to copy` after translation completes.
 7. User presses Enter.
-8. App copies translation to clipboard and closes popup.
+8. App copies translation to clipboard and dismisses the panel.
 
-### 10.5 Menu-bar popup
+### 10.5 Panel contents
 
-Phase 0 popup should include:
+TLiquid is a single window — a menu-bar panel (§19.2). Settings is a *view inside this panel*, reached by the gear icon, not a separate window. Quit lives on the tray's right-click menu, not inside the panel.
+
+Phase 0 panel should include:
 
 ```text
-[TLiquid]
-
-Input text area
-Target: Auto / Primary / Secondary / Choose language
-Translate button
-Output area
-Copy button
-
-Settings
-Quit
+┌ TLiquid ───────────────────── ⚙ ┐   ⚙ = open Settings view
+│ Input text area                  │
+│ Target: Auto / Primary /         │
+│         Secondary / Choose lang   │
+│ Translate button                 │
+│ Output area                      │
+│ Copy button                      │
+└──────────────────────────────────┘
 ```
 
-Language rows should not be in the main menu-bar menu as top-level items. They should live inside settings or a compact target-language selector inside the popup.
+Language rows should not be top-level items in the tray menu. They live inside the Settings view or as a compact target-language selector in the panel.
 
 ### 10.6 Settings
 
@@ -589,14 +590,14 @@ Phase 0:
 
 ```text
 Selected-text translation output:
-[x] Show result popup
+[x] Show result in panel
 ```
 
 Phase 1:
 
 ```text
 Selected-text translation output:
-[ ] Show result popup
+[ ] Show result in panel
 [ ] Copy result to clipboard automatically
 [ ] Replace selected text, where supported
 ```
@@ -604,7 +605,7 @@ Selected-text translation output:
 Default:
 
 ```text
-Show result popup
+Show result in panel
 ```
 
 Replacing selected text is not Phase 0 because it is risky and platform-sensitive.
@@ -692,7 +693,7 @@ Planned phases:
 Guaranteed Phase 0 core flow remains:
 
 ```text
-Select text → global hotkey → result popup
+Select text → global hotkey → panel (prefilled)
 ```
 
 ---
@@ -714,7 +715,7 @@ Select text → global hotkey → result popup
 
 ### 12.2 Translation
 
-**FR-011:** User must be able to translate manually from popup input box.  
+**FR-011:** User must be able to translate manually from the panel input box.  
 **FR-012:** User must be able to translate selected text using primary global shortcut on macOS.  
 **FR-013:** User must be able to translate selected text using secondary global shortcut on macOS when secondary language exists.  
 **FR-014:** App must auto-detect source language through provider prompt/model behavior.  
@@ -739,7 +740,7 @@ Select text → global hotkey → result popup
 
 **FR-028:** App must register global shortcut for primary translation on macOS.  
 **FR-029:** App must register global shortcut for secondary translation on macOS where secondary language exists.  
-**FR-030:** App must register global shortcut for opening manual translation popup on macOS.  
+**FR-030:** App must register global shortcut for opening the translation panel on macOS.  
 **FR-031:** App must show configured shortcuts in UI.  
 **FR-032:** Phase 1 must allow user to change shortcuts.  
 **FR-033:** App must detect shortcut registration failure and show user-readable error.  
@@ -837,7 +838,7 @@ TLiquid is an always-running utility. Therefore:
 2. Avoid heavy background workers.
 3. Avoid polling loops.
 4. Avoid unnecessary network calls.
-5. Keep UI windows closed when idle.
+5. Use a single window (the panel), kept hidden when idle. It is created once at startup so summoning it is an instant show/hide, not a repeated webview load — one webview's footprint rather than several.
 6. Keep only menu-bar, shortcut listeners, and minimal app state active.
 
 ### 13.3 Reliability
@@ -950,13 +951,14 @@ The UI itself still needs a frontend layer because Tauri renders app UI through 
 
 Svelte is selected because TLiquid needs a small, simple, reactive UI rather than a large web application framework.
 
-Svelte should be used for:
+Svelte should be used for the single panel and its views:
 
-- Settings window.
-- Manual translation popup.
-- Result popup.
+- Translate view (input + result).
+- Settings view (reached by the gear icon, not a separate window).
 - Provider/model forms.
 - Language configuration.
+
+These are views within one window, switched in the frontend — not separate native windows (§19.2).
 
 If a technical spike shows that vanilla HTML/CSS/TypeScript is sufficient and smaller, that can be reconsidered. Default decision remains Svelte.
 
@@ -979,10 +981,9 @@ TLiquid App Process
 ├─ macOS Keychain Secret Storage Manager
 ├─ Local Diagnostics Export Manager
 ├─ Update Manager, Phase 2
-└─ UI Windows
-   ├─ Manual Translation Popup
-   ├─ Result Popup
-   └─ Settings Window
+└─ UI: single menu-bar Panel (one window)
+   ├─ Translate view (input + result)
+   └─ Settings view (gear icon; not a separate window)
 ```
 
 ### 15.4 Language routing engine
@@ -1066,6 +1067,12 @@ TranslationResponse
 ├─ tokenUsage optional
 └─ error optional
 ```
+
+Transport and streaming (Phase 0 decisions):
+
+- Adapters make **direct HTTP requests** to each provider's REST API using `reqwest` — **not** provider SDKs. There are no first-party Rust SDKs for OpenAI/Anthropic/Gemini/OpenRouter; TLiquid uses only a thin slice of each API (one translation call, optional model list, optional key check), and this `Provider` interface is already the abstraction, so wrapping several community SDKs behind it would add dependencies and divergent idioms for no gain. `reqwest` uses the system TLS stack (macOS Secure Transport), avoiding an OpenSSL build dependency and keeping the always-running utility small.
+- **Phase 0 is non-streaming.** `translate` awaits the complete provider response and returns a single `TranslationResponse`. `supportsStreaming` exists on the interface but is `false` for every Phase 0 adapter.
+- **Streaming is a Phase 1 goal** (§3.2): stream provider deltas — SSE for the cloud providers (OpenAI/Anthropic/Gemini/OpenRouter), NDJSON for Ollama — into the panel incrementally via a Tauri channel, and set `supportsStreaming` true per capable adapter. The non-streaming path remains a fallback.
 
 ### 15.6 Default prompt template
 
@@ -1199,7 +1206,7 @@ Local mode includes:
 - Full app source code.
 - Unlimited target languages.
 - BYOK provider calls.
-- Manual translation popup.
+- Manual translation panel.
 - Selected-text hotkey translation.
 - Primary/secondary language routing.
 - Provider/model configuration.
@@ -1289,17 +1296,44 @@ Update requirements:
 6. Avoid heavy custom UI unless necessary.
 7. Avoid making the app feel like a full chat client.
 
-### 19.2 Popup behavior
+### 19.2 Panel behavior (single-window decision)
 
-Phase 0:
+TLiquid is **one window**: a frameless panel that drops down from the menu bar,
+anchored near the tray icon. Everything (manual translation, the selected-text
+result, and Settings) happens in this one panel; the frontend switches between
+a translate view and a Settings view. There is no separate settings window and
+no separate result popup.
 
-- Popup opens from menu-bar area.
-- Result popup also opens from menu-bar area.
-- Cursor-positioned popup is not required.
+Reference apps for the intended feel: **Raycast**, **Docker Desktop's tray
+panel**, and **JetBrains Toolbox** — click the menu-bar icon (or press a
+hotkey) and a compact panel appears at the top of the screen near the tray,
+then dismisses when you're done.
+
+Phase 0 behavior:
+
+- The panel is a single window, created **once at startup and kept hidden**, so
+  opening it is an instant show rather than a fresh window/webview load. This
+  also keeps the idle footprint to one webview.
+- Left-clicking the tray icon **toggles** the panel; it is positioned just
+  below the clicked icon (a tray right-click opens a small Open/Settings/Quit menu).
+- The panel **floats above other apps, including macOS fullscreen Spaces**, so
+  it can be summoned from anywhere — like Docker/Raycast. Technically this is:
+  Accessory activation policy (no Dock) + an always-on-top, visible-on-all-workspaces, frameless window.
+- A selected-text hotkey opens this same panel **prefilled** with the source
+  text and its translation (§10.2, §10.3) — not a separate overlay window.
+- Cursor-positioned (follow-the-text-cursor) placement is **not** required;
+  tray-anchored placement is the Phase 0 target.
+
+Rationale (performance + UX): one window means one webview to keep warm, instant
+view switching (a state change, not a window open), shared in-memory state
+between the translate and Settings views, and no stray windows for the user to
+manage. See `src-tauri/src/windows.rs`.
 
 Future:
 
-- Cursor-positioned popup may be evaluated after multi-monitor, DPI, and OS permission issues are better understood.
+- Auto-hide the panel when it loses focus (Docker/Raycast-style dismissal).
+- Cursor-positioned placement may be evaluated after multi-monitor, DPI, and OS
+  permission issues are better understood.
 
 ### 19.3 macOS Liquid Glass consideration
 
@@ -1341,7 +1375,7 @@ Mitigation:
 - Make hotkey workflow primary.
 - Explain permissions clearly.
 - Restore clipboard carefully.
-- Provide manual popup fallback.
+- Provide manual panel fallback.
 - Add local diagnostics export for capture issues.
 
 ### 20.2 Right-click context menu integration
@@ -1453,7 +1487,7 @@ Phase 0 can be considered complete when:
 3. App uses Rust + Tauri + Svelte.
 4. App starts and stays in menu-bar mode.
 5. App does not show a Dock item while idle where macOS allows this.
-6. User can open manual translation popup.
+6. User can open the translation panel from the tray icon or a hotkey.
 7. User can configure at least one provider key.
 8. User can select default model.
 9. User has mandatory primary language, English by default.
@@ -1482,8 +1516,8 @@ Goal: prove the critical macOS integrations.
 Deliverables:
 
 1. Tauri app starts hidden in macOS menu bar.
-2. Svelte popup opens from menu bar.
-3. Global shortcut opens popup.
+2. Svelte panel opens from the menu bar, anchored near the tray icon.
+3. Global shortcut opens the panel.
 4. Selected-text capture works on macOS via simulated copy or accessibility path.
 5. Basic OpenAI/Gemini/Anthropic/OpenRouter call works.
 6. Clipboard restoration prototype.
@@ -1493,9 +1527,9 @@ Deliverables:
 
 Deliverables:
 
-1. macOS menu-bar menu.
-2. Manual translation popup.
-3. Settings window.
+1. macOS menu-bar menu + tray-anchored panel.
+2. Manual translation in the panel.
+3. Settings view inside the panel (gear icon).
 4. Language settings: primary, secondary, additional.
 5. Provider API key configuration.
 6. Model dropdown.
@@ -1510,7 +1544,7 @@ Deliverables:
 2. Secondary translation shortcut.
 3. macOS selected text capture.
 4. Primary/secondary language routing.
-5. Translation result popup.
+5. Selected-text result shown in the panel (prefilled).
 6. Enter-to-copy behavior.
 7. Error handling.
 8. Permission onboarding.
@@ -1570,8 +1604,8 @@ Deliverables:
 
 ## 24. Open questions
 
-1. Should TLiquid support streaming translation output or wait for full response?
-2. Should result popup auto-close after copy, after timeout, or only manually?
+1. ~~Should TLiquid support streaming translation output or wait for full response?~~ **Resolved:** Phase 0 **waits for the full response** — translations are short, and it keeps the adapters and IPC simple. Streaming is deferred to Phase 1 (§3.2, §15.5).
+2. Should the panel auto-close after copy, after timeout, or only manually?
 3. Should the app support “copy source + translation” formatting?
 4. Should OpenRouter be recommended as the easiest provider during onboarding?
 5. Which models should be suggested by default for low-cost translation?
@@ -1588,7 +1622,7 @@ Deliverables:
 For Phase 0, TLiquid should optimize for the workflow that is most likely to be reliable on macOS:
 
 ```text
-Select text → press primary or secondary hotkey → show translation → Enter copies → popup closes
+Select text → press primary or secondary hotkey → panel shows translation → Enter copies → panel dismisses
 ```
 
 Right-click integration, Windows, and Linux should not block the MVP.
@@ -1603,7 +1637,7 @@ macOS global shortcuts
 Primary/secondary language routing
 Provider adapters
 macOS Keychain secure local key storage
-Manual popup fallback
+Manual panel fallback
 Best-effort macOS selected-text capture
 No telemetry network calls
 No hosted backend dependency

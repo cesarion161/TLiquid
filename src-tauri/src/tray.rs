@@ -1,10 +1,15 @@
 //! macOS menu-bar (tray) shell (P0-002).
+//!
+//! Left-clicking the tray toggles the single TLiquid panel, anchored under the
+//! icon (Raycast / Docker Desktop tray / JetBrains Toolbox style). Right-click
+//! opens a small menu (Open, Settings…, Quit). "Settings…" opens the panel and
+//! asks it to switch to its Settings view via the `navigate` event.
 
 use crate::windows;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
-    tray::TrayIconBuilder,
-    AppHandle,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Emitter,
 };
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
@@ -23,16 +28,30 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .icon(icon)
         .tooltip("TLiquid")
         .menu(&menu)
-        .show_menu_on_left_click(true)
+        // Left-click toggles the panel; the menu opens on right-click.
+        .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => {
-                let _ = windows::show_main(app);
+                let _ = windows::show_panel(app, None);
             }
             "settings" => {
-                let _ = windows::show_settings(app);
+                let _ = windows::show_panel(app, None);
+                // Ask the panel to switch to its Settings view.
+                let _ = app.emit_to(windows::PANEL_LABEL, "navigate", "settings");
             }
             "quit" => app.exit(0),
             _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                position,
+                ..
+            } = event
+            {
+                let _ = windows::toggle_panel(tray.app_handle(), Some(position));
+            }
         })
         .build(app)?;
 

@@ -1,9 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { isTauri } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import { info } from "@tauri-apps/plugin-log";
   import { appVersion } from "./lib/tauri";
+  import Settings from "./Settings.svelte";
+  import Result from "./Result.svelte";
 
+  // The whole app is one window. Navigation between the translate view and the
+  // Settings view is just a state swap here — no second window. See
+  // src-tauri/src/windows.rs for why TLiquid is single-window.
+  type View = "translate" | "settings";
+
+  let view = $state<View>("translate");
   let version = $state("…");
   let error = $state<string | null>(null);
 
@@ -20,22 +29,46 @@
 
     try {
       version = await appVersion();
-      await info(`TLiquid UI ready (v${version})`);
+      await info(`TLiquid panel ready (v${version})`);
     } catch (e) {
       error = String(e);
     }
+
+    // The tray "Settings…" item asks the panel to switch views.
+    await listen<View>("navigate", (event) => {
+      view = event.payload;
+    });
   });
 </script>
 
-<main>
-  <h1>TLiquid</h1>
-  <p class="tagline">BYOK LLM translator · macOS menu-bar utility</p>
-  <p class="version">v{version}</p>
+<div class="panel">
+  <!-- Frameless window: this bar is the drag handle and houses the gear/back. -->
+  <header class="titlebar" data-tauri-drag-region>
+    <span class="title">TLiquid</span>
+    <button
+      class="icon-btn"
+      title={view === "settings" ? "Back" : "Settings"}
+      aria-label={view === "settings" ? "Back" : "Settings"}
+      onclick={() => (view = view === "settings" ? "translate" : "settings")}
+    >
+      {view === "settings" ? "←" : "⚙"}
+    </button>
+  </header>
+
   {#if error}
     <p class="error">{error}</p>
+  {:else if view === "settings"}
+    <Settings {version} />
+  {:else}
+    <!-- Manual translation. The input/result wiring lands in P0-011 / P0-012;
+         a selected-text hotkey opens this same panel prefilled (P0-014/P0-015). -->
+    <section class="body">
+      <textarea
+        class="input"
+        placeholder="Type or paste text to translate…"
+        disabled
+      ></textarea>
+      <Result />
+    </section>
   {/if}
-  <p class="note">
-    Phase 0 foundation scaffold. The manual translation popup is implemented in
-    task P0-011.
-  </p>
-</main>
+</div>
