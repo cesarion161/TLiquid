@@ -120,7 +120,9 @@
     {#if view === "translate"}
       <button
         class="icon-btn bell"
-        title="Notifications"
+        title={notificationCount > 0
+          ? `Notifications (${notificationCount} new)`
+          : "Notifications"}
         aria-label={notificationCount > 0
           ? `Notifications (${notificationCount} new)`
           : "Notifications"}
