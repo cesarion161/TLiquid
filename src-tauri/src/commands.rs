@@ -28,6 +28,13 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Result<()> {
     config::save(&app, &settings)
 }
 
+/// Absolute path to the non-secret settings file, shown in the UI so users can
+/// find/edit advanced settings by hand (FR-047, FR-048).
+#[tauri::command]
+pub fn settings_path(app: AppHandle) -> Result<String> {
+    Ok(config::config_path(&app)?.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 pub fn set_provider_key(provider: ProviderId, key: String) -> Result<()> {
     secrets::set_key(provider.as_str(), &key)

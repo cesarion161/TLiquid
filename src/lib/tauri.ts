@@ -81,6 +81,9 @@ export const getSettings = (): Promise<Settings> => invoke("get_settings");
 export const saveSettings = (settings: Settings): Promise<void> =>
   invoke("save_settings", { settings });
 
+/** Absolute path to the non-secret settings file (FR-047, FR-048). */
+export const settingsPath = (): Promise<string> => invoke("settings_path");
+
 export const setProviderKey = (provider: ProviderId, key: string): Promise<void> =>
   invoke("set_provider_key", { provider, key });
 

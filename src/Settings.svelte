@@ -1,12 +1,39 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { isTauri } from "@tauri-apps/api/core";
+  import { revealItemInDir } from "@tauri-apps/plugin-opener";
+  import { settingsPath } from "./lib/tauri";
+
   // Settings view of the panel (not a separate window). The version is passed
   // down from App so this view doesn't re-fetch it.
   //
-  // P0-003 lays out the section structure (PRD §10.6); the interactive content
+  // P0-003 laid out the section structure (PRD §10.6); the interactive content
   // of each section is filled by later tasks: Languages (P0-006), Shortcuts
   // (P0-007), Providers & Models (P0-009), Output/Privacy (P0-017), and
-  // Updates/About (P0-018).
+  // Updates/About (P0-018). P0-004 adds the config-file location below.
   let { version = "—" }: { version?: string } = $props();
+
+  let configPath = $state<string | null>(null);
+
+  onMount(async () => {
+    if (!isTauri()) return;
+    try {
+      configPath = await settingsPath();
+    } catch {
+      configPath = null;
+    }
+  });
+
+  async function reveal() {
+    if (!configPath) return;
+    // The file should exist (written at startup), but guard the rare first-run
+    // failure so a rejected reveal doesn't surface as an unhandled rejection.
+    try {
+      await revealItemInDir(configPath);
+    } catch {
+      /* nothing actionable for the user; the path is shown above to copy. */
+    }
+  }
 </script>
 
 <section class="body">
@@ -46,7 +73,37 @@
   </div>
 
   <div class="section">
+    <h2 class="section__title">Settings file</h2>
+    <p class="hint">
+      Advanced non-secret settings can be edited here. API keys are stored
+      separately in the macOS Keychain, never in this file.
+    </p>
+    {#if configPath}
+      <code class="path">{configPath}</code>
+      <div class="row">
+        <button class="btn" onclick={reveal}>Reveal in Finder</button>
+      </div>
+    {/if}
+  </div>
+
+  <div class="section">
     <h2 class="section__title">About</h2>
     <p class="hint">TLiquid v{version}</p>
   </div>
 </section>
+
+<style>
+  .path {
+    display: block;
+    padding: var(--tl-sp-2) var(--tl-sp-3);
+    border: 1px solid var(--tl-border);
+    border-radius: var(--tl-radius-sm);
+    background: var(--tl-bg);
+    color: var(--tl-text-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: var(--tl-fs-sm);
+    user-select: text;
+    -webkit-user-select: text;
+    word-break: break-all;
+  }
+</style>

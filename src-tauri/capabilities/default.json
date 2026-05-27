@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "opener:default",
+    "opener:allow-reveal-item-in-dir",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
     "log:default"

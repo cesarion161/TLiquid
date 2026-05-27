@@ -44,6 +44,13 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            // Materialize the settings file on first run so its location (shown
+            // in the UI) is real and users can hand-edit it (FR-047, FR-048).
+            // Best-effort: a write failure must not block launch.
+            if let Err(e) = config::ensure_initialized(app.handle()) {
+                log::warn!("could not initialize settings file: {e}");
+            }
+
             // Create the panel once, hidden, so summoning it later is an instant
             // show rather than a fresh webview load (PRD §13.2).
             windows::create_panel(app.handle())?;
@@ -61,6 +68,7 @@ pub fn run() {
             commands::list_providers,
             commands::get_settings,
             commands::save_settings,
+            commands::settings_path,
             commands::set_provider_key,
             commands::delete_provider_key,
             commands::has_provider_key,
