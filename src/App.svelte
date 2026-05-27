@@ -5,7 +5,7 @@
   import { info } from "@tauri-apps/plugin-log";
   import { appVersion } from "./lib/tauri";
   import Settings from "./Settings.svelte";
-  import Result from "./Result.svelte";
+  import Translate from "./Translate.svelte";
 
   // The whole app is one window. Navigation between the translate view and the
   // Settings view is just a state swap here — no second window. See
@@ -62,31 +62,8 @@
   {:else if view === "settings"}
     <Settings {version} />
   {:else}
-    <!-- Manual translation surface (PRD §10.5). This view's layout is the UI
-         foundation (P0-003); the controls are inert here and get wired to a
-         real provider call in P0-011 (translate) / P0-012 (result + copy). -->
-    <section class="body">
-      <div class="field">
-        <label class="label" for="source-text">Text</label>
-        <textarea
-          id="source-text"
-          class="textarea"
-          placeholder="Type or paste text to translate…"
-          disabled
-        ></textarea>
-      </div>
-
-      <div class="row">
-        <div class="field grow">
-          <label class="label" for="target-lang">Target</label>
-          <select id="target-lang" class="select" disabled>
-            <option>Auto (primary / secondary)</option>
-          </select>
-        </div>
-        <button class="btn btn--primary" disabled>Translate</button>
-      </div>
-
-      <Result />
-    </section>
+    <!-- Manual translation surface (PRD §10.4/§10.5). Owns its own state and the
+         real provider call; remounts on each switch back so it re-reads settings. -->
+    <Translate />
   {/if}
 </div>

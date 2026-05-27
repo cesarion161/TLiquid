@@ -1,25 +1,43 @@
 <script lang="ts">
-  // Output pane of the translate view (a region in the panel, not its own
-  // window). This is the UI foundation (P0-003): a scrollable output area, a
-  // Copy button, and the "Press Enter to copy" affordance. Real result
-  // rendering, clipboard copy, and Enter-to-copy are wired in P0-012.
+  // Output pane of the translate view (P0-011/P0-012). Presentational: the
+  // parent owns the translation state and the clipboard call; this renders the
+  // output, a Copy button, the "Press Enter to copy" affordance, and errors.
+  let {
+    output = null,
+    error = null,
+    busy = false,
+    copied = false,
+    onCopy,
+  }: {
+    output?: string | null;
+    error?: string | null;
+    busy?: boolean;
+    copied?: boolean;
+    onCopy: () => void;
+  } = $props();
 </script>
 
 <div class="field grow">
-  <!-- The output is a non-form region, so it gets a plain label paired with
-       aria-labelledby (a <label for> only binds to form controls). aria-live
-       lets screen readers announce the translation when P0-012 fills it. -->
   <span id="translation-label" class="label">Translation</span>
   <div
-    class="output hint"
+    class="output"
+    class:hint={!output && !error}
     role="region"
     aria-labelledby="translation-label"
     aria-live="polite"
   >
-    Translation output appears here.
+    {#if error}
+      <span class="error">{error}</span>
+    {:else if busy}
+      Translating…
+    {:else if output}
+      {output}
+    {:else}
+      Translation output appears here.
+    {/if}
   </div>
   <div class="row">
-    <button class="btn" disabled>Copy</button>
-    <span class="hint">Press Enter to copy</span>
+    <button class="btn" onclick={onCopy} disabled={!output}>Copy</button>
+    <span class="hint">{copied ? "Copied!" : "Press Enter to copy"}</span>
   </div>
 </div>
