@@ -252,17 +252,38 @@ body {
 
 /* ── Output & text ───────────────────────────────────────────────────────── */
 
-/* Translation output area: fills remaining height and scrolls on overflow. */
+/* Translation output area: a bordered box that fills remaining height. The text
+ * scrolls in `.output-body`; the copy affordance is pinned to its bottom-right. */
 .output {
+  position: relative;
   flex: 1;
   min-height: 48px;
-  padding: var(--tl-sp-3);
   border: 1px solid var(--tl-border);
   border-radius: var(--tl-radius);
   background: var(--tl-surface);
+  overflow: hidden;
+}
+
+.output-body {
+  height: 100%;
   overflow-y: auto;
+  padding: var(--tl-sp-3);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Copy affordance, pinned in the field's bottom-right corner. Its surface
+ * background keeps it legible over any text behind it. */
+.output-actions {
+  position: absolute;
+  right: var(--tl-sp-1);
+  bottom: var(--tl-sp-1);
+  display: flex;
+  align-items: center;
+  gap: var(--tl-sp-1);
+  padding: 1px 2px 1px 6px;
+  background: var(--tl-surface);
+  border-radius: var(--tl-radius-sm);
 }
 
 .hint {

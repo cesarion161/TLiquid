@@ -24,51 +24,51 @@
 </script>
 
 <div class="field grow">
-  {#if output}
-    <!-- Copy affordance lives in the top-right above the output, so the result
-         area isn't crowded by a button row below it. -->
-    <div class="row">
-      <span class="grow"></span>
-      <span class="hint">{copied ? "Copied!" : "Press Enter to copy"}</span>
-      <button
-        class="icon-btn"
-        onclick={onCopy}
-        aria-label="Copy translation"
-        title="Copy translation"
-      >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <rect x="9" y="9" width="11" height="11" rx="2"></rect>
-          <path d="M5 15V5a2 2 0 0 1 2-2h10"></path>
-        </svg>
-      </button>
+  <div class="output">
+    <div
+      class="output-body"
+      class:hint={!output && !error}
+      role="region"
+      aria-label="Translation"
+      aria-live="polite"
+    >
+      {#if error}
+        <span class="error">{error}</span>
+      {:else if busy}
+        Translating…
+      {:else if output}
+        {output}
+      {:else}
+        Translation output appears here.
+      {/if}
     </div>
-  {/if}
 
-  <div
-    class="output"
-    class:hint={!output && !error}
-    role="region"
-    aria-label="Translation"
-    aria-live="polite"
-  >
-    {#if error}
-      <span class="error">{error}</span>
-    {:else if busy}
-      Translating…
-    {:else if output}
-      {output}
-    {:else}
-      Translation output appears here.
+    {#if output}
+      <!-- Pinned in the field's bottom-right corner, inside the box. -->
+      <div class="output-actions">
+        <span class="hint">{copied ? "Copied!" : "Press Enter to copy"}</span>
+        <button
+          class="icon-btn"
+          onclick={onCopy}
+          aria-label="Copy translation"
+          title="Copy translation"
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+            <path d="M5 15V5a2 2 0 0 1 2-2h10"></path>
+          </svg>
+        </button>
+      </div>
     {/if}
   </div>
 
