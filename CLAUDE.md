@@ -49,9 +49,10 @@ means adding a component and a branch to `App.svelte`'s view switch — **not** 
 entry or window.
 
 The window itself (`src-tauri/src/windows.rs`, label `"main"`) is:
-- **Created once at startup, hidden** (`create_panel`), so summoning it is an instant `show`/`hide`, never a fresh webview load. Dev builds auto-show it; release stays hidden until summoned. It's a compact size (360×400) — the input and translation areas scroll on overflow.
-- **Frameless + `always_on_top` + `visible_on_all_workspaces`**, which — combined with the macOS Accessory activation policy set in `lib.rs` — lets it float over other apps including fullscreen Spaces. The slim titlebar (drag handle + gear/back, no title text) is drawn in the UI (`.titlebar` with `data-tauri-drag-region`).
-- **Summon + auto-hide (Spotlight-style)**: `show_panel` is the single entry point — `tray.rs` left-click, the tray menu's "Open"/"Settings…", and the global hotkeys all call it (there is no toggle). It anchors the panel under the tray icon via `position_under_tray`, which reads the tray icon's screen `rect()` (so it works for hotkey summons too, not just clicks) and feeds the pure, unit-tested `panel_origin` clamping. The panel **auto-hides on blur** (`WindowEvent::Focused(false)` → `hide`) — click outside or switch apps to dismiss; re-summon via the tray or a hotkey. A close gesture (`CloseRequested`) also hides rather than destroys (keeps the menu-bar app alive). Tray right-click opens the menu; "Settings…" also emits a `navigate` event the frontend listens for to switch views.
+- **Created once at startup, hidden** (`create_panel`), so summoning it is an instant `show`/`hide`, never a fresh webview load. Dev builds auto-show it; release stays hidden until summoned. It's a compact size (360×270) — the input and translation areas scroll on overflow.
+- **Frameless + `always_on_top` + `visible_on_all_workspaces`**, which — combined with the macOS Accessory activation policy set in `lib.rs` — lets it float over other apps including fullscreen Spaces. The slim titlebar (drag handle + gear/back, no title text) is drawn in the UI (`.titlebar` with `data-tauri-drag-region`); dragging needs the `core:window:allow-start-dragging` capability.
+- **Summon + auto-hide (Spotlight-style)**: `show_panel` is the single entry point (there is no toggle) — `tray.rs` left-click, the tray menu's "Open"/"Settings…", and the translate hotkey (via `on_trigger`, only when it captured text or hit an error) all call it. Until the user drags the window, each summon anchors it under the tray icon via `position_under_tray` (reads the tray icon's screen `rect()` + the pure, unit-tested `panel_origin` clamping). The panel **auto-hides on blur** (`Focused(false)` → `hide`) and on **Esc** (App.svelte) — re-summon via the tray or the hotkey. A `CloseRequested` also hides rather than destroys (keeps the menu-bar app alive).
+- **Draggable + position-remembering** (Raycast-style): the user can drag the panel by the titlebar; once dragged it stops re-anchoring and the position is remembered across restarts (`window.json` beside `settings.json`, validated against connected monitors). Only genuine user drags are saved — moves while the window is hidden (our anchoring/restoring) are ignored (`USER_POSITIONED`). Tray right-click opens the menu; "Settings…" also emits a `navigate` event the frontend listens for to switch views.
 
 ### The IPC boundary (keep these in sync)
 `src/lib/tauri.ts` is the **only** place the frontend calls `invoke` — Svelte components import
@@ -67,14 +68,17 @@ on the TS side. Mismatches surface as runtime deserialization errors, not type e
 
 ### Rust module map (`src-tauri/src/`)
 - `lib.rs` — app builder: plugin registration, panel creation, tray setup, macOS accessory mode (no Dock), `invoke_handler`. `main.rs` just calls `run()`.
-- `tray.rs` — menu-bar shell; the tray is the app's primary surface. Left-click toggles the panel anchored under the icon; right-click opens a menu (Open / Settings… / Quit).
-- `windows.rs` — the single panel window: create-hidden-at-startup, show/hide/toggle, tray-anchored positioning (above).
+- `tray.rs` — menu-bar shell; the tray is the app's primary surface. Left-click summons the panel; right-click opens a menu (Open / Settings… / Quit).
+- `windows.rs` — the single panel window: create-hidden-at-startup, summon (`show_panel`)/hide, tray-anchored-then-draggable positioning + position persistence, auto-hide on blur (above).
+- `shortcuts.rs` — global hotkeys (P0-007). Two only: ⌘⇧T translate-selection and ⌘⇧⌥T translate-to-secondary. Each captures the selection first (`capture`) and only summons the panel when there's text or a capture failure — no selection is a silent no-op.
+- `capture.rs` — macOS selected-text capture (P0-013): probe-the-clipboard + simulated ⌘C + poll. Returns a 3-way `Capture` (`Text` / `NoSelection` / `Failed`); `Enigo::new` returning `NoPermission` is how "no Accessibility permission" is told apart from "no selection".
 - `commands.rs` — the IPC surface (above).
 - `config.rs` — non-secret settings, persisted as `settings.json` in the app config dir. Corrupt files are renamed to `.json.bak` and defaults used, never silently discarded. `Settings::default()` is the source of truth for defaults.
 - `secrets.rs` — API keys in the **macOS Keychain** via the `keyring` crate (service `com.tliquid.app`, account = provider id). Keys never go in `settings.json` or logs.
 - `languages.rs` — routing engine. `resolve()` returns a `Resolution`. Primary-mode routing is **not** resolved to one target up front — source detection happens inside the LLM, so the routing rules are encoded into the prompt (`PrimaryRouted`).
 - `translation.rs` — pure, provider-neutral prompt builders. No translation text is persisted anywhere.
 - `providers/` — provider abstraction (see below).
+- `diagnostics.rs` — local, copy-to-clipboard diagnostics report (P0-016). Non-secret metadata only, never uploaded.
 - `error.rs` — `AppError` serializes to its message string only. Messages must never embed API keys, prompts, translation text, or provider responses.
 
 ### Provider abstraction (`src-tauri/src/providers/`)

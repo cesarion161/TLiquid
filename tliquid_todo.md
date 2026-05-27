@@ -99,6 +99,36 @@ Goal: after all Phase 0 tasks are complete, TLiquid must be a working installabl
 
 ---
 
+## 3a. Post-Phase-0 refinements (intentional — do not revert)
+
+After the Phase 0 MVP, the app was refined from live use. These supersede details in
+the per-task notes above and in PRD v0.3 (see PRD §0 Addendum). Treat them as the
+current intended behavior:
+
+- **Hotkeys simplified to two.** Removed the open-panel hotkey (⌘⌥T); the panel is
+  opened manually by clicking the tray icon. ⌘⇧T = translate selection, ⌘⇧⌥T =
+  translate to secondary. The hotkey captures first: **no selection → silent no-op**
+  (no panel); **no Accessibility permission → panel + guidance** (the two are
+  distinguished via `Enigo::new` returning `NoPermission`); selection → translate.
+  Dropped `shortcuts.open_manual_popup` from config/UI/types.
+- **Target selector is sticky.** Hotkey + manual translation both honor the Target
+  dropdown; the primary/secondary auto-routing rules apply only when Target = "Auto".
+- **Provider/model defaults.** First saved key auto-becomes the default provider; each
+  provider has a built-in default model (`gpt-5-mini`, `claude-haiku-4-5`,
+  `gemini-2.5-flash`, `openai/gpt-5-mini`) so translation works immediately.
+- **Capture rewritten** to a clipboard-probe + poll (reliable across apps/timing;
+  Terminal works) returning a 3-way outcome (`Text`/`NoSelection`/`Failed`).
+- **Window:** compact 360×270; **auto-hide on blur and Esc**; **draggable + remembers
+  position across restarts** (`window.json`), anchoring under the tray only until
+  dragged; summon (no toggle). Needs `core:window:allow-start-dragging`.
+- **UI:** slim titlebar with no "TLiquid" title; no "Text"/"Translation" field labels
+  (placeholders instead); Target label + dropdown + Translate on one row; primary
+  button is high-contrast black/white (not the accent); no accent focus ring on text
+  fields; copy affordance ("Press Enter to copy" + icon) pinned inside the output
+  field's bottom-right; translate view keeps its state across Settings trips.
+
+---
+
 ## 4. Phase 1 — macOS polish, local models, right-click integration
 
 Goal: improve the macOS product after MVP, add startup behavior, configurable shortcuts, local model support, output modes, and macOS right-click integration.
@@ -108,7 +138,7 @@ Goal: improve the macOS product after MVP, add startup behavior, configurable sh
 | Task ID | Name | Phase | PRD FRs | Status | Agent ID | Datetime started | Datetime finished | Acceptance criteria | Notes |
 |---|---|---|---|---|---|---|---|---|---|
 | P1-001 | Implement startup-on-login for macOS | Phase 1 | FR-053, FR-054, FR-055 | not-started |  |  |  | User can enable/disable launch at login; default onboarding offers ON behavior with clear consent; setting persists; app launches into menu-bar mode. | Use Tauri/plugin or macOS-native mechanism. |
-| P1-002 | Implement configurable shortcuts | Phase 1 | FR-032, FR-033, FR-034 | not-started |  |  |  | User can change primary, secondary, open-panel, and optional additional-language shortcuts; conflicts are detected; invalid shortcuts are rejected; settings persist. | Include reset-to-default action. |
+| P1-002 | Implement configurable shortcuts | Phase 1 | FR-032, FR-033, FR-034 | not-started |  |  |  | User can change the primary (translate-selection) and secondary shortcuts, and optional additional-language shortcuts; conflicts are detected; invalid shortcuts are rejected; settings persist. | Include reset-to-default action. The open-panel hotkey was removed post-Phase-0 (panel opens via the tray); see §3a. |
 | P1-003 | Implement configurable output behavior | Phase 1 | FR-016, FR-017, FR-018 | not-started |  |  |  | User can choose show panel and/or copy to clipboard automatically; replace-selection option is either safely implemented or explicitly hidden/experimental; defaults remain safe. | Replacing selected text must not be default. |
 | P1-004 | Add Ollama/local model support | Phase 1 | FR-039, FR-043 | not-started |  |  |  | User can configure local Ollama endpoint; available models can be listed or manually configured; translation works without cloud provider key; errors are clear when Ollama is unavailable. | Keep provider abstraction unchanged. |
 | P1-005 | Implement macOS right-click integration | Phase 1 | Right-click plan, FR-012, FR-013 | not-started |  |  |  | macOS selected text can be sent to TLiquid through Services or equivalent right-click/native mechanism; user can translate through contextual action where macOS supports it; hotkey remains primary fallback. | Do not block core flow on this. |

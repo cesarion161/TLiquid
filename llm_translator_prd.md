@@ -12,6 +12,45 @@
 
 ---
 
+## 0. Addendum — implemented behavior (authoritative; supersedes v0.3 where noted)
+
+The Phase 0 MVP shipped, then was refined from live use. Where the sections below
+describe something different, **the implementation is authoritative** — keep these
+deviations when iterating (they were deliberate, not bugs):
+
+- **Hotkeys (supersedes §9.2/§9.3/§10.4):** there are **two** global shortcuts, not
+  three. ⌘⇧T = "translate the selection"; ⌘⇧⌥T = "translate the selection to the
+  secondary language". The standalone **open-panel hotkey (⌘⌥T) was removed** — open
+  the panel for manual typing by clicking the tray icon. The translate hotkey
+  **captures the selection first**: if nothing is selected it does **nothing**
+  (no panel); if Accessibility permission is missing it opens with guidance; only a
+  real selection opens the panel and translates.
+- **Target is a sticky session choice (supersedes the §9.2 auto-routing-by-default):**
+  the panel's Target selector is honored for both manual and hotkey translation. An
+  explicit language is always used; the **primary/secondary auto-routing rules apply
+  only when Target = "Auto"**. The ⌘⇧⌥T hotkey sets Target to the secondary language.
+- **Default provider/model (extends §10.6.3/§10.6.4):** saving the first provider key
+  auto-selects that provider as default, and each provider gets a built-in default
+  model so the user can translate immediately (currently `gpt-5-mini`,
+  `claude-haiku-4-5`, `gemini-2.5-flash`, `openai/gpt-5-mini`).
+- **Panel behavior (supersedes §19.2 "Future"):** auto-hide-on-blur **and Esc-to-hide
+  are implemented**. The panel is **draggable and remembers its position across
+  restarts** (Raycast-style); it anchors under the tray icon only until the user drags
+  it. There is no toggle — tray click / hotkey **summon** it.
+- **Visual (supersedes §19.1 #5):** the primary action button is **high-contrast
+  black (light) / white (dark)**, not the accent color; the accent is not used as a
+  button fill. The panel is compact (360×270); the "Text"/"Translation" field labels
+  were dropped in favor of placeholders; the copy affordance lives inside the output
+  field's bottom-right corner.
+- **Settings model (supersedes §16):** `shortcuts.openManualPopup` was removed;
+  `shortcuts.enabled` (master on/off) was added. Window position is persisted
+  separately in `window.json`, not in `settings.json`.
+
+See `CLAUDE.md` for the current architecture and `tliquid_todo.md` §"Post-Phase-0
+refinements" for the change log.
+
+---
+
 ## 1. Product summary
 
 TLiquid is a lightweight, open-source, macOS-first desktop translator that runs silently in the background, exposes a persistent menu-bar icon, and lets users translate selected text from any macOS application with minimal friction.
