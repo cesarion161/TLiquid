@@ -16,6 +16,9 @@ pub enum AppError {
 
     #[error("capture error: {0}")]
     Capture(String),
+
+    #[error("update error: {0}")]
+    Update(String),
 }
 
 // Tauri requires command error types to be serializable. We expose only the

@@ -21,5 +21,10 @@ src-tauri/gen/
 .env
 .env.*
 
+# Updater signing keys (P2-007). The minisign PRIVATE key must NEVER be committed;
+# it lives here locally and is mirrored to the GitHub secret TAURI_SIGNING_PRIVATE_KEY.
+# The matching PUBLIC key is embedded in tauri.conf.json (safe to publish).
+.tauri/
+
 # Idea
 .idea

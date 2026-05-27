@@ -4,7 +4,12 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { info } from "@tauri-apps/plugin-log";
-  import { appVersion, getSettings, type Language } from "./lib/tauri";
+  import {
+    appVersion,
+    getSettings,
+    type Language,
+    type UpdateStatus,
+  } from "./lib/tauri";
   import Settings from "./Settings.svelte";
   import Translate from "./Translate.svelte";
   import Notifications from "./Notifications.svelte";
@@ -45,9 +50,17 @@
   // Whether the one-time launch-at-login consent has been answered (P1-001).
   // Until it has, the bell shows a badge and the Notifications view offers it.
   // Assume answered until settings load so the badge doesn't flash for users
-  // who already responded. Future: also surface new-version alerts here (P2-007).
+  // who already responded.
   let startupPrompted = $state(true);
-  const notificationCount = $derived(startupPrompted ? 0 : 1);
+
+  // The update found by the most recent check (P2-007), shared so both the bell
+  // badge and the Notifications pane reflect it. Null = no update pending.
+  let pendingUpdate = $state<UpdateStatus | null>(null);
+
+  // Bell badge: pending launch-at-login consent + an available update.
+  const notificationCount = $derived(
+    (startupPrompted ? 0 : 1) + (pendingUpdate?.available ? 1 : 0),
+  );
 
   // Switch views; manual navigation drops any pending hotkey request so returning
   // to translate doesn't replay an old capture.
@@ -212,10 +225,15 @@
       request={shortcutRequest}
       onOpenSettings={() => goTo("settings")}
     />
-    <Settings {version} hidden={view !== "settings"} />
+    <Settings
+      {version}
+      hidden={view !== "settings"}
+      onUpdateAvailable={(s) => (pendingUpdate = s)}
+    />
     <Notifications
       hidden={view !== "notifications"}
       {startupPrompted}
+      update={pendingUpdate}
       onAnswered={() => (startupPrompted = true)}
     />
   {/if}

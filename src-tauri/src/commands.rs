@@ -4,6 +4,7 @@
 use crate::config::{self, Settings};
 use crate::error::{AppError, Result};
 use crate::providers::{self, ProviderId, ProviderMeta, TranslationRequest, TranslationResponse};
+use crate::updater::{self, DownloadProgress, UpdateStatus};
 use crate::{diagnostics, secrets, shortcuts, startup, translation};
 use tauri::AppHandle;
 
@@ -269,4 +270,29 @@ pub async fn translate_stream(
         .translate_stream(&key, &request.model, &plan.prompt, &sink)
         .await?;
     Ok(finish(&request, plan, started, text))
+}
+
+/// Check GitHub Releases for a newer version (P2-007 manual / FR-060/061). The
+/// returned status drives the Settings → Updates UI and lights the notification
+/// bell; a found update is stashed so `download_and_install_update` can install
+/// it without re-fetching. Never downloads or installs — that's a separate,
+/// always-user-initiated step.
+#[tauri::command]
+pub async fn check_for_update(app: AppHandle) -> Result<UpdateStatus> {
+    updater::check(&app).await
+}
+
+/// Download, verify, and install the pending update, then relaunch into the new
+/// version (P2-007 / FR-062/063). `on_progress` streams download progress to the
+/// panel. The user always triggers this explicitly; it is never automatic.
+#[tauri::command]
+pub async fn download_and_install_update(
+    app: AppHandle,
+    on_progress: tauri::ipc::Channel<DownloadProgress>,
+) -> Result<()> {
+    updater::download_and_install(&app, on_progress).await?;
+    // Relaunch into the freshly installed bundle (FR-063). `restart` diverges, so
+    // this command's IPC response never returns — the webview is torn down and
+    // re-created on the new process. The frontend treats the call as terminal.
+    app.restart();
 }

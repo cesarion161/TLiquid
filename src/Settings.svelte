@@ -8,6 +8,7 @@
     settingsPath,
     applyShortcuts,
     type Settings,
+    type UpdateStatus,
   } from "./lib/tauri";
   import { isRecordingShortcut } from "./lib/recording";
   import LanguageSettings from "./LanguageSettings.svelte";
@@ -27,8 +28,16 @@
   // Output/Privacy (P0-017), and Updates/About (P0-018) follow.
   // `hidden` keeps this view mounted but off-screen while the translate view is
   // active (so neither view loses its state on a switch).
-  let { version = "—", hidden = false }: { version?: string; hidden?: boolean } =
-    $props();
+  let {
+    version = "—",
+    hidden = false,
+    // Bubbles an update found by the Updates section up to App (lights the bell).
+    onUpdateAvailable = () => {},
+  }: {
+    version?: string;
+    hidden?: boolean;
+    onUpdateAvailable?: (status: UpdateStatus | null) => void;
+  } = $props();
 
   let configPath = $state<string | null>(null);
   let settings = $state<Settings | null>(null);
@@ -118,7 +127,7 @@
     {/if}
   </div>
 
-  <AboutSettings {version} />
+  <AboutSettings {version} {onUpdateAvailable} />
 </section>
 
 <style>

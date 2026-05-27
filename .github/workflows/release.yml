@@ -92,6 +92,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          # Updater (P2-007): sign the `.app.tar.gz` with the minisign private key
+          # and upload `latest.json` to the release. Distinct from the Apple cert
+          # above — updates are verified by the pubkey in tauri.conf.json, so they
+          # work even on an unsigned build. With no secret set, the build still
+          # succeeds but produces no signed updater artifacts (no auto-updates).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: 'TLiquid ${{ github.ref_name }}'

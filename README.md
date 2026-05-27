@@ -192,7 +192,13 @@ language is always used; **Auto** applies the primary/secondary rules
 (top-left of the panel) — open it to find the offer to start TLiquid at login
 (recommended; nothing is enabled without your click). Change it anytime in
 **Settings → Startup** — it starts straight into the menu bar. The bell is also
-where new-version alerts will appear once update checks ship (a later version).
+where **new-version alerts** appear.
+
+**Updates** (P2-007): open **Settings → Updates** and click **Check for updates**.
+If a newer version exists, a **Download & install** button appears (and the 🔔
+bell lights up with the same offer) — clicking it downloads a signed bundle,
+verifies it, installs it in place, and relaunches TLiquid. No manual reinstall,
+and updates are never silent: you always click to install.
 
 The panel drops down under the menu-bar icon, **remembers where you drag it**, and
 **auto-hides when it loses focus** (click outside, switch apps, or press **Esc**) —

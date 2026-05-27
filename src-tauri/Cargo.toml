@@ -52,6 +52,9 @@ async-trait = "0.1"
 tauri-plugin-single-instance = "2"
 # Launch-at-login (P1-001). macOS uses a LaunchAgent.
 tauri-plugin-autostart = "2"
+# In-app updates (P2-007 manual check/install + P2-013 auto-check). Fetches a
+# minisign-signed full-bundle update from GitHub Releases; desktop-only.
+tauri-plugin-updater = "2"
 
 # Selected-text capture (P0-013) simulates Cmd+C. macOS-only in Phase 0; keeping
 # the dependency platform-gated avoids pulling input libs on other targets.

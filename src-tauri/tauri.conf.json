@@ -16,8 +16,17 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/cesarion161/TLiquid/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdERkRDNjE2QTZDQzk3MkIKUldRcmw4eW1Gc2I5ZlM3TkE5ZVlIWTlHVno1UnhiS00vRXRweFBJaEFkYzlDWWVESmsxbkwxWGoK"
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["app", "dmg"],
     "category": "public.app-category.productivity",
     "shortDescription": "BYOK LLM translator in your menu bar.",

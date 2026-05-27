@@ -142,7 +142,57 @@ base64 for the secret:
 base64 -i certificate.p12 | pbcopy
 ```
 
-## 6. Status (P1-008)
+## 6. In-app update signing (P2-007)
+
+TLiquid's in-app updater (Settings → Updates) downloads a **full app bundle**
+(`.app.tar.gz`) from GitHub Releases and verifies it against a **minisign**
+public key embedded in `tauri.conf.json` (`plugins.updater.pubkey`). This is a
+**separate key from the Apple Developer cert** above — update verification does
+not depend on Apple signing, so auto-updates work even while the app is unsigned.
+
+### 6.1 The signing keypair
+
+A keypair was generated with `pnpm tauri signer generate`. The **public** key is
+committed in `tauri.conf.json`. The **private** key lives at
+`.tauri/tliquid_updater.key` (gitignored — **never commit it**) and must be
+mirrored to a repository secret:
+
+| Secret | Purpose |
+|---|---|
+| `TAURI_SIGNING_PRIVATE_KEY` | the contents of `.tauri/tliquid_updater.key` |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | the key's password (empty for this key) |
+
+```bash
+# add the private key as a secret (requires the gh CLI, authenticated)
+gh secret set TAURI_SIGNING_PRIVATE_KEY < .tauri/tliquid_updater.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body ''
+```
+
+> **Lost key = no more updates.** If the private key is lost, you cannot sign
+> updates that existing installs will accept; users would have to reinstall
+> manually. Back it up securely. To rotate, generate a new keypair, replace the
+> `pubkey` in `tauri.conf.json`, and ship it in a release signed with the **old**
+> key (so current installs accept the update that introduces the new key).
+
+### 6.2 How a release produces updates
+
+With `bundle.createUpdaterArtifacts: true` (set in `tauri.conf.json`) and the
+signing secret present, the release workflow:
+
+1. builds the `.app.tar.gz` updater bundle and signs it (`.sig`);
+2. generates `latest.json` (version + per-target download URL + signature);
+3. uploads both to the GitHub Release.
+
+The app's updater endpoint is
+`https://github.com/cesarion161/TLiquid/releases/latest/download/latest.json`.
+
+> **Publish the draft.** The workflow creates a **draft** release
+> (`releaseDraft: true`). GitHub's `/releases/latest/` only serves the newest
+> **published** (non-draft, non-prerelease) release, so `latest.json` is not
+> reachable — and clients see no update — until you **publish** the draft. Review
+> the artifacts, then publish.
+
+## 7. Status
 
 - **Implemented:** Hardened-Runtime + entitlements config, env-driven signing &
   notarization, the DMG installer layout, the `build-macos.sh` helper, the

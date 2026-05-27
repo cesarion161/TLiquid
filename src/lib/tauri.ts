@@ -152,6 +152,42 @@ export const translate = (
   request: TranslationRequest,
 ): Promise<TranslationResponse> => invoke("translate", { request });
 
+/** Result of an update check (P2-007). Mirrors `updater::UpdateStatus`. */
+export interface UpdateStatus {
+  /** Whether a newer version than the running one is available. */
+  available: boolean;
+  /** The currently running app version. */
+  currentVersion: string;
+  /** The available version (set only when `available`). */
+  version: string | null;
+  /** Release notes from `latest.json`, when the publisher included a body. */
+  notes: string | null;
+}
+
+/** One download-progress tick during an update install (P2-007). */
+export interface DownloadProgress {
+  /** Bytes downloaded so far. */
+  downloaded: number;
+  /** Total bytes, when the server reported a Content-Length. */
+  total: number | null;
+}
+
+/**
+ * Check GitHub Releases for a newer version (P2-007 manual check / FR-060/061).
+ * Never downloads or installs — that's the separate, user-initiated step below.
+ */
+export const checkForUpdate = (): Promise<UpdateStatus> =>
+  invoke("check_for_update");
+
+/**
+ * Download, verify, install the pending update and relaunch into it (P2-007 /
+ * FR-062/063). `onProgress` receives download ticks. On success the app
+ * restarts, so this promise typically never resolves; it rejects on failure.
+ */
+export const downloadAndInstallUpdate = (
+  onProgress: Channel<DownloadProgress>,
+): Promise<void> => invoke("download_and_install_update", { onProgress });
+
 /** One incremental text chunk streamed during a translation (P1-009). */
 export interface TranslationDelta {
   text: string;

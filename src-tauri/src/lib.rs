@@ -22,6 +22,7 @@ mod shortcuts;
 mod startup;
 mod translation;
 mod tray;
+mod updater;
 mod windows;
 
 pub use error::{AppError, Result};
@@ -47,6 +48,11 @@ pub fn run() {
         tauri_plugin_autostart::MacosLauncher::LaunchAgent,
         None,
     ));
+
+    // In-app updates (P2-007 manual check/install; P2-013 background poll).
+    // Endpoint + minisign public key live in `tauri.conf.json`. Desktop only.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 
     builder
         .plugin(tauri_plugin_opener::init())
@@ -90,6 +96,10 @@ pub fn run() {
             windows::create_panel(app.handle())?;
             tray::create(app.handle())?;
 
+            // Holds the update found by the most recent check so the install
+            // command can apply it without re-fetching (P2-007).
+            app.manage(updater::PendingUpdate::default());
+
             // Register the default global shortcuts (FR-028/029/030). Failures
             // (e.g. an accelerator owned by another app) are stored for the
             // Settings UI rather than aborting launch (FR-033).
@@ -132,6 +142,8 @@ pub fn run() {
             commands::export_diagnostics,
             commands::set_launch_at_login,
             commands::is_launch_at_login,
+            commands::check_for_update,
+            commands::download_and_install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TLiquid");
