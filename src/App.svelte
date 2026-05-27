@@ -48,7 +48,7 @@
     <button
       class="icon-btn"
       title={view === "settings" ? "Back" : "Settings"}
-      aria-label={view === "settings" ? "Back" : "Settings"}
+      aria-label={view === "settings" ? "Back to translate" : "Open settings"}
       onclick={() => (view = view === "settings" ? "translate" : "settings")}
     >
       {view === "settings" ? "←" : "⚙"}
@@ -56,18 +56,36 @@
   </header>
 
   {#if error}
-    <p class="error">{error}</p>
+    <section class="body">
+      <p class="error">{error}</p>
+    </section>
   {:else if view === "settings"}
     <Settings {version} />
   {:else}
-    <!-- Manual translation. The input/result wiring lands in P0-011 / P0-012;
-         a selected-text hotkey opens this same panel prefilled (P0-014/P0-015). -->
+    <!-- Manual translation surface (PRD §10.5). This view's layout is the UI
+         foundation (P0-003); the controls are inert here and get wired to a
+         real provider call in P0-011 (translate) / P0-012 (result + copy). -->
     <section class="body">
-      <textarea
-        class="input"
-        placeholder="Type or paste text to translate…"
-        disabled
-      ></textarea>
+      <div class="field">
+        <label class="label" for="source-text">Text</label>
+        <textarea
+          id="source-text"
+          class="textarea"
+          placeholder="Type or paste text to translate…"
+          disabled
+        ></textarea>
+      </div>
+
+      <div class="row">
+        <div class="field grow">
+          <label class="label" for="target-lang">Target</label>
+          <select id="target-lang" class="select" disabled>
+            <option>Auto (primary / secondary)</option>
+          </select>
+        </div>
+        <button class="btn btn--primary" disabled>Translate</button>
+      </div>
+
       <Result />
     </section>
   {/if}

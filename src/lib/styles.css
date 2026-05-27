@@ -1,15 +1,41 @@
+/* TLiquid visual system (P0-003, PRD §19.1).
+ *
+ * A small, utility-like design language for the menu-bar panel — system
+ * typography, minimal chrome, light/dark following macOS, and an accent color
+ * reserved for the primary action. Tokens live in :root; the component classes
+ * below are the reusable primitives the translate and settings views build on.
+ */
+
 :root {
+  /* Accent — applied mainly to the primary action button (PRD §19.1 #5). */
   --tl-accent: #2f7df6;
+  --tl-accent-hover: #2b71dd;
+  --tl-on-accent: #ffffff;
+
+  /* Surfaces & text. */
   --tl-bg: #f6f6f7;
   --tl-surface: #ffffff;
+  --tl-surface-hover: #efeff1;
   --tl-text: #1c1c1e;
   --tl-text-muted: #6b6b70;
   --tl-border: #e2e2e5;
   --tl-error: #c0392b;
 
+  /* Spacing scale (4px base) and radii — keeps the layout consistent. */
+  --tl-sp-1: 4px;
+  --tl-sp-2: 8px;
+  --tl-sp-3: 12px;
+  --tl-sp-4: 16px;
+  --tl-radius: 8px;
+  --tl-radius-sm: 6px;
+
+  /* Type scale. */
+  --tl-fs-sm: 12px;
+  --tl-fs-base: 14px;
+
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
     system-ui, sans-serif;
-  font-size: 14px;
+  font-size: var(--tl-fs-base);
   line-height: 1.5;
   color: var(--tl-text);
   background: var(--tl-bg);
@@ -19,11 +45,15 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* Light/dark follows the system (PRD §19.1 #4, FR-046). */
 @media (prefers-color-scheme: dark) {
   :root {
     --tl-accent: #4c8dff;
+    --tl-accent-hover: #5d98ff;
+    --tl-on-accent: #ffffff;
     --tl-bg: #1c1c1e;
     --tl-surface: #2c2c2e;
+    --tl-surface-hover: #3a3a3c;
     --tl-text: #f2f2f7;
     --tl-text-muted: #9a9aa0;
     --tl-border: #3a3a3c;
@@ -46,6 +76,23 @@ body {
   height: 100%;
 }
 
+/* Keyboard users get a visible focus ring everywhere (PRD §13.6 accessibility).
+ * Outline only — each element keeps its own border-radius. */
+:focus-visible {
+  outline: 2px solid var(--tl-accent);
+  outline-offset: 2px;
+}
+
+/* Respect "reduce motion" — the app has no essential animation either way. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ── Panel shell ─────────────────────────────────────────────────────────── */
+
 /* The panel: a frameless menu-bar window with a draggable custom titlebar. */
 .panel {
   display: flex;
@@ -57,7 +104,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px 8px 14px;
+  padding: var(--tl-sp-2) var(--tl-sp-2) var(--tl-sp-2) var(--tl-sp-4);
   border-bottom: 1px solid var(--tl-border);
   background: var(--tl-surface);
   user-select: none;
@@ -76,8 +123,8 @@ body {
   color: var(--tl-text-muted);
   font-size: 15px;
   line-height: 1;
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: var(--tl-sp-1) var(--tl-sp-2);
+  border-radius: var(--tl-radius-sm);
   cursor: pointer;
 }
 
@@ -86,75 +133,140 @@ body {
   color: var(--tl-text);
 }
 
+/* Scrollable content region beneath the titlebar. */
 .body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
+  gap: var(--tl-sp-3);
+  padding: var(--tl-sp-4);
   overflow-y: auto;
 }
 
-.input {
+/* ── Form primitives ─────────────────────────────────────────────────────── */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tl-sp-1);
+}
+
+.label {
+  font-size: var(--tl-fs-sm);
+  font-weight: 600;
+  color: var(--tl-text-muted);
+}
+
+.select,
+.textarea {
   width: 100%;
-  min-height: 96px;
-  resize: none;
-  padding: 10px 12px;
+  padding: var(--tl-sp-2) var(--tl-sp-3);
   border: 1px solid var(--tl-border);
-  border-radius: 8px;
+  border-radius: var(--tl-radius);
   background: var(--tl-surface);
   color: var(--tl-text);
   font: inherit;
 }
 
-.result {
+.textarea {
+  min-height: 96px;
+  resize: none;
+}
+
+.select:disabled,
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tl-sp-2);
+}
+
+/* Fill available space within a flex row/column. */
+.grow {
   flex: 1;
 }
 
-h1 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
 
-.tagline {
-  margin: 2px 0 12px;
-  color: var(--tl-text-muted);
-  font-size: 12px;
-}
-
-.version {
-  margin: 0;
-  color: var(--tl-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.note {
-  margin-top: 16px;
-  padding: 10px 12px;
-  background: var(--tl-surface);
+.btn {
+  appearance: none;
   border: 1px solid var(--tl-border);
-  border-radius: 8px;
+  border-radius: var(--tl-radius);
+  padding: var(--tl-sp-2) var(--tl-sp-4);
+  background: var(--tl-surface);
+  color: var(--tl-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--tl-surface-hover);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* The single primary action carries the accent color (PRD §19.1 #5). */
+.btn--primary {
+  border-color: transparent;
+  background: var(--tl-accent);
+  color: var(--tl-on-accent);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--tl-accent-hover);
+}
+
+/* ── Output & text ───────────────────────────────────────────────────────── */
+
+/* Translation output area: fills remaining height and scrolls on overflow. */
+.output {
+  flex: 1;
+  min-height: 96px;
+  padding: var(--tl-sp-3);
+  border: 1px solid var(--tl-border);
+  border-radius: var(--tl-radius);
+  background: var(--tl-surface);
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.hint {
   color: var(--tl-text-muted);
-  font-size: 12px;
+  font-size: var(--tl-fs-sm);
 }
 
 .error {
   color: var(--tl-error);
+  font-size: var(--tl-fs-sm);
 }
 
-button.primary {
-  appearance: none;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 14px;
-  background: var(--tl-accent);
-  color: #fff;
+/* ── Settings sections ───────────────────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tl-sp-2);
+  padding-bottom: var(--tl-sp-4);
+  border-bottom: 1px solid var(--tl-border);
+}
+
+.section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.section__title {
+  margin: 0;
+  font-size: var(--tl-fs-base);
   font-weight: 600;
-  cursor: pointer;
-}
-
-button.primary:focus-visible {
-  outline: 2px solid var(--tl-accent);
-  outline-offset: 2px;
 }
