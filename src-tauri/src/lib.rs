@@ -14,11 +14,14 @@ mod error;
 mod languages;
 mod providers;
 mod secrets;
+mod shortcuts;
 mod translation;
 mod tray;
 mod windows;
 
 pub use error::{AppError, Result};
+
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -56,6 +59,18 @@ pub fn run() {
             windows::create_panel(app.handle())?;
             tray::create(app.handle())?;
 
+            // Register the default global shortcuts (FR-028/029/030). Failures
+            // (e.g. an accelerator owned by another app) are stored for the
+            // Settings UI rather than aborting launch (FR-033).
+            app.manage(shortcuts::ShortcutErrors::default());
+            let errors = shortcuts::apply(app.handle());
+            if !errors.is_empty() {
+                log::warn!(
+                    "some global shortcuts could not be registered ({} failed)",
+                    errors.len()
+                );
+            }
+
             // In dev, surface the panel immediately so the UI is visible without
             // clicking the tray. Release stays hidden until summoned.
             #[cfg(debug_assertions)]
@@ -76,6 +91,8 @@ pub fn run() {
             commands::test_provider_connection,
             commands::list_provider_models,
             commands::translate,
+            commands::apply_shortcuts,
+            commands::shortcut_errors,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TLiquid");

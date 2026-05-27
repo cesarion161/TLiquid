@@ -61,6 +61,14 @@ pub struct Shortcuts {
     pub translate_primary: String,
     pub translate_secondary: String,
     pub open_manual_popup: String,
+    /// Master switch for all global shortcuts (FR-034). Defaulted (rather than
+    /// required) so a settings file written before this field still loads.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -123,6 +131,7 @@ impl Default for Settings {
                 translate_primary: "Cmd+Shift+T".into(),
                 translate_secondary: "Cmd+Shift+Option+T".into(),
                 open_manual_popup: "Cmd+Option+T".into(),
+                enabled: true,
             },
             providers: Providers::default(),
             default_provider: ProviderId::Openai,
@@ -251,6 +260,19 @@ mod tests {
             std::fs::read_to_string(&backup).unwrap(),
             "{ this is not valid json "
         );
+    }
+
+    #[test]
+    fn shortcuts_without_enabled_field_default_to_enabled() {
+        // Forward-compat: a settings file written before `enabled` existed must
+        // load with shortcuts enabled (FR-034), not fail and trigger a backup.
+        let json = r#"{
+            "translatePrimary": "Cmd+Shift+T",
+            "translateSecondary": "Cmd+Shift+Option+T",
+            "openManualPopup": "Cmd+Option+T"
+        }"#;
+        let shortcuts: Shortcuts = serde_json::from_str(json).unwrap();
+        assert!(shortcuts.enabled);
     }
 
     #[test]

@@ -4,6 +4,7 @@
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { getSettings, saveSettings, settingsPath, type Settings } from "./lib/tauri";
   import LanguageSettings from "./LanguageSettings.svelte";
+  import ShortcutSettings from "./ShortcutSettings.svelte";
   import ProviderSettings from "./ProviderSettings.svelte";
 
   // Settings view of the panel (not a separate window). The version is passed
@@ -70,12 +71,8 @@
     </div>
   {/if}
 
-  <div class="section">
-    <h2 class="section__title">Shortcuts</h2>
-    <p class="hint">Global hotkeys for primary, secondary, and manual translation.</p>
-  </div>
-
   {#if settings}
+    <ShortcutSettings {settings} onChange={persist} />
     <ProviderSettings {settings} onChange={persist} />
   {/if}
 

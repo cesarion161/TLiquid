@@ -4,7 +4,7 @@
 use crate::config::{self, Settings};
 use crate::error::{AppError, Result};
 use crate::providers::{self, ProviderId, ProviderMeta, TranslationRequest, TranslationResponse};
-use crate::{secrets, translation};
+use crate::{secrets, shortcuts, translation};
 use tauri::AppHandle;
 
 #[tauri::command]
@@ -32,6 +32,19 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Result<()> {
 #[tauri::command]
 pub fn settings_path(app: AppHandle) -> Result<String> {
     Ok(config::config_path(&app)?.to_string_lossy().into_owned())
+}
+
+/// Re-register the global shortcuts from current settings (e.g. after the user
+/// toggles them on/off). Returns messages for any that failed to register (FR-033).
+#[tauri::command]
+pub fn apply_shortcuts(app: AppHandle) -> Vec<String> {
+    shortcuts::apply(&app)
+}
+
+/// Registration errors from the most recent shortcut (re)apply, for Settings.
+#[tauri::command]
+pub fn shortcut_errors(app: AppHandle) -> Vec<String> {
+    shortcuts::stored_errors(&app)
 }
 
 #[tauri::command]

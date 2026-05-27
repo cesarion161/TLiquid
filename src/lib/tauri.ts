@@ -58,6 +58,7 @@ export interface Settings {
     translatePrimary: string;
     translateSecondary: string;
     openManualPopup: string;
+    enabled: boolean;
   };
   providers: Record<ProviderId, { enabled: boolean; defaultModel: string | null }>;
   defaultProvider: ProviderId;
@@ -83,6 +84,12 @@ export const saveSettings = (settings: Settings): Promise<void> =>
 
 /** Absolute path to the non-secret settings file (FR-047, FR-048). */
 export const settingsPath = (): Promise<string> => invoke("settings_path");
+
+/** Re-register global shortcuts from settings; returns registration errors (FR-033). */
+export const applyShortcuts = (): Promise<string[]> => invoke("apply_shortcuts");
+
+/** Registration errors from the most recent shortcut apply. */
+export const shortcutErrors = (): Promise<string[]> => invoke("shortcut_errors");
 
 export const setProviderKey = (provider: ProviderId, key: string): Promise<void> =>
   invoke("set_provider_key", { provider, key });
