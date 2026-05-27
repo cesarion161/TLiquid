@@ -6,6 +6,7 @@
 
 mod anthropic;
 mod gemini;
+mod http;
 mod ollama;
 mod openai;
 mod openrouter;
@@ -83,6 +84,15 @@ pub struct ProviderMeta {
     pub supports_streaming: bool,
 }
 
+/// A provider-neutral prompt: a system instruction and the user content (the
+/// source text). Built by [`crate::translation`] from the routing decision and
+/// consumed by adapters, which map it onto each provider's chat/messages shape.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Prompt {
+    pub system: String,
+    pub user: String,
+}
+
 #[async_trait::async_trait]
 pub trait Provider: Send + Sync {
     fn id(&self) -> ProviderId;
@@ -93,13 +103,16 @@ pub trait Provider: Send + Sync {
     fn supports_streaming(&self) -> bool {
         false
     }
+    /// Check whether `api_key` is accepted by the provider. `Ok(true)` valid,
+    /// `Ok(false)` rejected (401/403), `Err` for network/other failures.
     async fn validate_key(&self, api_key: &str) -> Result<bool>;
+    /// List the model ids the key can use, for the model picker (FR-041).
     async fn list_models(&self, api_key: &str) -> Result<Vec<String>>;
-    async fn translate(
-        &self,
-        request: &TranslationRequest,
-        api_key: &str,
-    ) -> Result<TranslationResponse>;
+    /// Run one non-streaming translation and return the model's completion
+    /// text. The orchestrator ([`crate::translation`]) builds `prompt` and
+    /// wraps the result in a [`TranslationResponse`]; adapters stay response-
+    /// agnostic so error/latency assembly lives in one place.
+    async fn translate(&self, api_key: &str, model: &str, prompt: &Prompt) -> Result<String>;
 }
 
 /// Construct the adapter for a provider id.

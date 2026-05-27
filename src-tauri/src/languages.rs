@@ -23,6 +23,19 @@ pub enum Resolution {
     MissingSecondary,
 }
 
+impl Resolution {
+    /// Best-effort target to show in the result. In primary mode the real
+    /// target depends on the source the model detects, so this returns the
+    /// primary as a representative label. `None` only for [`Self::MissingSecondary`].
+    pub fn display_target(&self) -> Option<Language> {
+        match self {
+            Resolution::Fixed(lang) => Some(lang.clone()),
+            Resolution::PrimaryRouted { primary, .. } => Some(primary.clone()),
+            Resolution::MissingSecondary => None,
+        }
+    }
+}
+
 pub fn resolve(settings: &Settings, mode: RoutingMode, explicit: Option<Language>) -> Resolution {
     match mode {
         RoutingMode::Explicit => {

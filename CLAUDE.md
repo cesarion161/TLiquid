@@ -78,15 +78,20 @@ on the TS side. Mismatches surface as runtime deserialization errors, not type e
 - `error.rs` — `AppError` serializes to its message string only. Messages must never embed API keys, prompts, translation text, or provider responses.
 
 ### Provider abstraction (`src-tauri/src/providers/`)
-`mod.rs` defines the `Provider` async trait and the shared `TranslationRequest`/`TranslationResponse`/`ProviderMeta`
-types. `adapter(ProviderId)` is the factory; `all()` builds the metadata list for the settings UI. Each
-adapter (`openai.rs`, `anthropic.rs`, `gemini.rs`, `openrouter.rs`, `ollama.rs`) makes direct BYOK HTTP
-calls — **most are stubs returning "not implemented (P0-008)" errors**; real HTTP wiring is upcoming work.
+`mod.rs` defines the `Provider` async trait, the `Prompt` (system + user) the trait's `translate` consumes,
+and the shared `TranslationRequest`/`TranslationResponse`/`ProviderMeta` types. `adapter(ProviderId)` is the
+factory; `all()` builds the metadata list for the settings UI. The four cloud adapters (`openai.rs`,
+`anthropic.rs`, `gemini.rs`, `openrouter.rs`) make **real** direct BYOK HTTP calls (P0-008) through the shared
+`http.rs` helpers — one pooled `reqwest` client + status→message normalization that never leaks the key (it
+strips the URL from transport errors and ignores auth-error bodies). `ollama.rs` stays a Phase 1 stub (P1-004).
+`Provider::translate` returns just the completion **text**; the orchestrator (`commands::translate` →
+`translation::build_prompt`) resolves routing, builds the `Prompt`, times the call, and assembles the
+`TranslationResponse` — so adapters stay response-agnostic and error/latency logic lives in one place.
 Adding/changing a provider touches several places: the `ProviderId` enum + its `as_str()`, a module + an
 `adapter()` match arm + the `all()` list, a field on `config::Providers`, and the `ProviderId` union in `src/lib/tauri.ts`.
 
 **Transport decisions (PRD §15.5):** adapters use raw `reqwest` (system TLS, no OpenSSL) — **not provider
 SDKs** (none are first-party for Rust; the trait is already the abstraction). **Phase 0 is non-streaming**:
-`translate` awaits the full response and returns one `TranslationResponse`, and `supports_streaming()` is
+the orchestrator awaits the full completion and returns one `TranslationResponse`, and `supports_streaming()` is
 `false` everywhere. Streaming (SSE for cloud providers / NDJSON for Ollama → a Tauri channel) is a Phase 1
-task (P1-009), so don't reach for `reqwest`'s `stream` feature or change the `translate` return shape in Phase 0.
+task (P1-009), so don't reach for `reqwest`'s `stream` feature in Phase 0.

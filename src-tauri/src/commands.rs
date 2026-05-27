@@ -3,7 +3,7 @@
 
 use crate::config::{self, Settings};
 use crate::error::{AppError, Result};
-use crate::languages::{self, Resolution};
+use crate::languages;
 use crate::providers::{self, ProviderId, ProviderMeta, TranslationRequest, TranslationResponse};
 use crate::{secrets, translation};
 use tauri::AppHandle;
@@ -66,8 +66,10 @@ pub async fn list_provider_models(provider: ProviderId) -> Result<Vec<String>> {
     providers::adapter(provider).list_models(&key).await
 }
 
-/// Translate text. The full provider call lands in P0-010; this wires the
-/// routing engine, prompt assembly and Keychain lookup that feed it.
+/// Translate text: resolve routing → build the provider-neutral prompt → look
+/// up the Keychain key → call the provider adapter → assemble the response.
+/// Non-streaming in Phase 0 (one `TranslationResponse`); streaming is P1-009.
+/// No source or translated text is persisted (FR-019).
 #[tauri::command]
 pub async fn translate(app: AppHandle, request: TranslationRequest) -> Result<TranslationResponse> {
     let settings = config::load(&app);
@@ -77,14 +79,11 @@ pub async fn translate(app: AppHandle, request: TranslationRequest) -> Result<Tr
         request.routing_mode,
         request.explicit_target_language.clone(),
     );
-    if matches!(resolution, Resolution::MissingSecondary) {
-        return Err(AppError::Provider(
-            "No secondary language is configured.".into(),
-        ));
-    }
+    let target_language = resolution
+        .display_target()
+        .ok_or_else(|| AppError::Provider("No secondary language is configured.".into()))?;
 
-    // Prompt assembly is provider-neutral; adapters consume it in P0-010.
-    let _prompt = translation::build_prompt(&resolution, &request.source_text);
+    let prompt = translation::build_prompt(&resolution, &request.source_text);
 
     let key = secrets::get_key(request.provider.as_str())?.ok_or_else(|| {
         AppError::Provider(format!(
@@ -93,7 +92,25 @@ pub async fn translate(app: AppHandle, request: TranslationRequest) -> Result<Tr
         ))
     })?;
 
-    providers::adapter(request.provider)
-        .translate(&request, &key)
-        .await
+    let started = std::time::Instant::now();
+    let translated_text = providers::adapter(request.provider)
+        .translate(&key, &request.model, &prompt)
+        .await?;
+    let latency_ms = started.elapsed().as_millis() as u64;
+
+    // Strip only the blank lines models tend to wrap answers in — not all
+    // whitespace — so a code-block translation keeps its indentation and inner
+    // formatting (the prompt promises to preserve it).
+    let translated_text = translated_text
+        .trim_matches(|c| c == '\n' || c == '\r')
+        .to_string();
+
+    Ok(TranslationResponse {
+        translated_text,
+        detected_source_language: None,
+        target_language,
+        provider: request.provider,
+        model: request.model,
+        latency_ms,
+    })
 }
