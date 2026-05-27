@@ -71,20 +71,17 @@
       view = event.payload;
     });
 
-    // A global shortcut summoned the panel (shortcuts.rs). "open" just shows the
-    // translate view; "primary"/"secondary" carry the captured selection.
+    // A selected-text hotkey summoned the panel (shortcuts.rs) with the captured
+    // selection (or a capture error). It only fires when there's something to act
+    // on — a no-selection press is a silent no-op and never reaches here.
     await listen<{
-      action: "open" | "primary" | "secondary";
+      action: "primary" | "secondary";
       text: string | null;
       error: string | null;
     }>("shortcut", (event) => {
       const p = event.payload;
       view = "translate";
-      if (p.action === "open") {
-        shortcutRequest = null;
-      } else {
-        shortcutRequest = { action: p.action, text: p.text, error: p.error, id: ++seq };
-      }
+      shortcutRequest = { action: p.action, text: p.text, error: p.error, id: ++seq };
     });
   });
 

@@ -60,7 +60,6 @@ pub struct AdditionalLanguage {
 pub struct Shortcuts {
     pub translate_primary: String,
     pub translate_secondary: String,
-    pub open_manual_popup: String,
     /// Master switch for all global shortcuts (FR-034). Defaulted (rather than
     /// required) so a settings file written before this field still loads.
     #[serde(default = "default_true")]
@@ -130,7 +129,6 @@ impl Default for Settings {
             shortcuts: Shortcuts {
                 translate_primary: "Cmd+Shift+T".into(),
                 translate_secondary: "Cmd+Shift+Option+T".into(),
-                open_manual_popup: "Cmd+Option+T".into(),
                 enabled: true,
             },
             providers: Providers::default(),
@@ -266,6 +264,8 @@ mod tests {
     fn shortcuts_without_enabled_field_default_to_enabled() {
         // Forward-compat: a settings file written before `enabled` existed must
         // load with shortcuts enabled (FR-034), not fail and trigger a backup.
+        // (A stale `openManualPopup` field from an old config is harmlessly
+        // ignored — that shortcut was removed.)
         let json = r#"{
             "translatePrimary": "Cmd+Shift+T",
             "translateSecondary": "Cmd+Shift+Option+T",
@@ -281,7 +281,7 @@ mod tests {
         // accidental rename-all regression that would break the frontend.
         let json = serde_json::to_string(&Settings::default()).unwrap();
         assert!(json.contains("\"defaultProvider\""));
-        assert!(json.contains("\"openManualPopup\""));
+        assert!(json.contains("\"translatePrimary\""));
         assert!(!json.contains("\"default_provider\""));
     }
 }

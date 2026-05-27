@@ -14,9 +14,8 @@
   let errors = $state<string[]>([]);
 
   const rows = $derived([
-    { label: "Primary translation", accel: settings.shortcuts.translatePrimary },
-    { label: "Secondary translation", accel: settings.shortcuts.translateSecondary },
-    { label: "Open panel", accel: settings.shortcuts.openManualPopup },
+    { label: "Translate selection", accel: settings.shortcuts.translatePrimary },
+    { label: "Translate to secondary", accel: settings.shortcuts.translateSecondary },
   ]);
 
   // Render an accelerator like "Cmd+Shift+T" with macOS modifier glyphs.

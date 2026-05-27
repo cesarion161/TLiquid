@@ -57,7 +57,6 @@ export interface Settings {
   shortcuts: {
     translatePrimary: string;
     translateSecondary: string;
-    openManualPopup: string;
     enabled: boolean;
   };
   providers: Record<ProviderId, { enabled: boolean; defaultModel: string | null }>;

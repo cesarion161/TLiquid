@@ -4,19 +4,31 @@
 //! the frontmost app copies its selection over the probe, poll until the
 //! clipboard changes away from the probe, then restore the previous clipboard.
 //!
-//! Using a probe (rather than diffing against the previous clipboard) avoids two
-//! false negatives: a selection that happens to equal the prior clipboard, and a
-//! slower app (e.g. Terminal) that hasn't written the pasteboard by a fixed
-//! deadline. Polling tolerates that latency; if the clipboard never leaves the
-//! probe, nothing was copied (no selection, or copy was blocked).
+//! The result is a three-way [`Capture`] so the caller can tell apart the cases
+//! the user asked about:
+//! - [`Capture::Text`] — a selection was copied → translate it.
+//! - [`Capture::NoSelection`] — Accessibility is granted but nothing was copied
+//!   (no selection, or the app blocked copy) → do nothing, silently.
+//! - [`Capture::Failed`] — capture couldn't run at all, almost always because
+//!   Accessibility permission is missing → surface an actionable message.
 //!
-//! Posting the keystroke needs macOS Accessibility permission; if it's missing
-//! the copy is a no-op and we return a [`crate::error::AppError::Capture`] with
-//! guidance (FR-018). Restoration is best-effort: non-text clipboard contents
-//! (e.g. an image) can't be preserved by this approach (a known §20.1 edge case).
+//! Permission is detected up front: on macOS `Enigo::new` checks
+//! `AXIsProcessTrustedWithOptions` and returns `NoPermission` (also triggering
+//! the system prompt) when the app isn't trusted. Restoration is best-effort:
+//! non-text clipboard contents (e.g. an image) can't be preserved (§20.1 edge).
 
-use crate::error::{AppError, Result};
 use tauri::AppHandle;
+
+/// The outcome of a selected-text capture.
+pub enum Capture {
+    /// A selection was copied.
+    Text(String),
+    /// Permission is granted but nothing was copied (no selection / copy blocked).
+    NoSelection,
+    /// Capture couldn't run (e.g. missing Accessibility permission). The string
+    /// is an actionable message for the user.
+    Failed(String),
+}
 
 #[cfg(target_os = "macos")]
 mod imp {
@@ -30,8 +42,8 @@ mod imp {
 /// Capture the current selection from the frontmost app. Must run BEFORE the
 /// TLiquid panel takes focus, or Cmd+C would target TLiquid itself.
 #[cfg(target_os = "macos")]
-pub fn capture_selection(app: &AppHandle) -> Result<String> {
-    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+pub fn capture_selection(app: &AppHandle) -> Capture {
+    use enigo::{Direction, Enigo, Key, Keyboard, NewConError, Settings};
     use imp::{MAX_WAIT_MS, POLL_MS, PROBE};
     use std::{
         thread::sleep,
@@ -44,12 +56,21 @@ pub fn capture_selection(app: &AppHandle) -> Result<String> {
     // non-text content or was empty).
     let previous = clipboard.read_text().ok();
 
-    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| {
-        AppError::Capture(format!(
-            "Could not initialize input simulation: {e}. Grant TLiquid Accessibility \
-             permission in System Settings → Privacy & Security → Accessibility."
-        ))
-    })?;
+    // Permission check happens here: `Enigo::new` returns NoPermission (and opens
+    // the system prompt) when Accessibility isn't granted.
+    let mut enigo = match Enigo::new(&Settings::default()) {
+        Ok(enigo) => enigo,
+        Err(NewConError::NoPermission) => {
+            return Capture::Failed(
+                "TLiquid needs Accessibility permission to read the selection. Grant it in \
+                 System Settings → Privacy & Security → Accessibility, then try again. If \
+                 TLiquid isn't listed there, run the installed TLiquid.app — capture can't work \
+                 when launched from a terminal or `tauri dev`."
+                    .into(),
+            );
+        }
+        Err(e) => return Capture::Failed(format!("Could not initialize input simulation: {e}.")),
+    };
 
     // Seed a probe so we can tell "nothing copied" from "copied text equal to the
     // previous clipboard". Best-effort: if it fails, the poll below still works.
@@ -82,38 +103,27 @@ pub fn capture_selection(app: &AppHandle) -> Result<String> {
     let _ = clipboard.write_text(previous.as_deref().unwrap_or(""));
 
     if let Err(e) = copy_result {
-        return Err(AppError::Capture(format!(
-            "Could not simulate copy: {e}. Grant TLiquid Accessibility permission in \
-             System Settings → Privacy & Security → Accessibility."
-        )));
+        return Capture::Failed(format!("Could not simulate copy: {e}."));
     }
-    interpret(captured)
+    outcome(captured)
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn capture_selection(_app: &AppHandle) -> Result<String> {
-    Err(AppError::Capture(
-        "Selected-text capture is only available on macOS in Phase 0.".into(),
-    ))
+pub fn capture_selection(_app: &AppHandle) -> Capture {
+    Capture::Failed("Selected-text capture is only available on macOS in Phase 0.".into())
 }
 
-/// Map the polled result to a translation input. `Some` means the app wrote a
-/// real selection over the probe; `None` means it never did (no selection, or
-/// the copy was blocked / Accessibility is off). Pure, so it is unit-tested.
+/// Map the polled clipboard result to an outcome (permission already verified):
+/// copied text → [`Capture::Text`]; nothing copied → [`Capture::NoSelection`].
+/// Pure, so it's unit-tested.
 ///
-/// `cfg`-gated to macOS-or-tests: the non-macOS `capture_selection` stub doesn't
-/// call it, so this keeps a non-macOS build warning-free under `-D warnings`.
+/// `cfg`-gated to macOS-or-tests so a non-macOS build stays warning-free.
 #[cfg(any(target_os = "macos", test))]
-fn interpret(captured: Option<String>) -> Result<String> {
-    captured.ok_or_else(|| {
-        AppError::Capture(
-            "No text was captured. Make sure text is selected, and that TLiquid has \
-             Accessibility permission (System Settings → Privacy & Security → Accessibility). \
-             If TLiquid isn't listed there, run the installed TLiquid.app — capture can't work \
-             when the app is launched from a terminal or `tauri dev`."
-                .into(),
-        )
-    })
+fn outcome(captured: Option<String>) -> Capture {
+    match captured {
+        Some(text) => Capture::Text(text),
+        None => Capture::NoSelection,
+    }
 }
 
 #[cfg(test)]
@@ -121,18 +131,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn captured_text_is_returned() {
-        assert_eq!(interpret(Some("hello".into())).unwrap(), "hello");
+    fn copied_text_becomes_text() {
+        assert!(matches!(outcome(Some("hello".into())), Capture::Text(t) if t == "hello"));
     }
 
     #[test]
-    fn a_selection_equal_to_the_old_clipboard_still_captures() {
-        // The probe approach means an unchanged-looking selection is still real.
-        assert_eq!(interpret(Some("same".into())).unwrap(), "same");
-    }
-
-    #[test]
-    fn nothing_copied_is_a_no_selection_error() {
-        assert!(interpret(None).is_err());
+    fn nothing_copied_is_no_selection() {
+        assert!(matches!(outcome(None), Capture::NoSelection));
     }
 }

@@ -21,7 +21,6 @@ pub struct ShortcutErrors(pub Mutex<Vec<String>>);
 
 #[derive(Clone, Copy)]
 enum Action {
-    OpenPanel,
     Primary,
     Secondary,
 }
@@ -35,12 +34,6 @@ pub fn apply(app: &AppHandle) -> Vec<String> {
     let settings = crate::config::load(app);
     let mut errors = Vec::new();
     if settings.shortcuts.enabled {
-        register(
-            app,
-            &settings.shortcuts.open_manual_popup,
-            Action::OpenPanel,
-            &mut errors,
-        );
         register(
             app,
             &settings.shortcuts.translate_primary,
@@ -94,33 +87,25 @@ struct ShortcutPayload {
 }
 
 fn on_trigger(app: &AppHandle, action: Action) {
-    let payload = match action {
-        Action::OpenPanel => {
-            let _ = windows::show_panel(app);
-            ShortcutPayload {
-                action: "open",
-                text: None,
-                error: None,
-            }
-        }
-        Action::Primary | Action::Secondary => {
-            // Capture the selection BEFORE showing our panel, so the simulated
-            // Cmd+C targets the app the user is actually in, not TLiquid (P0-013).
-            let (text, error) = match capture::capture_selection(app) {
-                Ok(t) => (Some(t), None),
-                Err(e) => (None, Some(e.to_string())),
-            };
-            let _ = windows::show_panel(app);
-            ShortcutPayload {
-                action: if matches!(action, Action::Primary) {
-                    "primary"
-                } else {
-                    "secondary"
-                },
-                text,
-                error,
-            }
-        }
+    // Capture the selection BEFORE showing our panel, so the simulated Cmd+C
+    // targets the app the user is actually in, not TLiquid (P0-013).
+    let (text, error) = match capture::capture_selection(app) {
+        capture::Capture::Text(t) => (Some(t), None),
+        capture::Capture::Failed(msg) => (None, Some(msg)),
+        // No selection (permission is fine): do nothing — don't even summon the
+        // panel. The user asked for a silent no-op in this case.
+        capture::Capture::NoSelection => return,
+    };
+
+    let _ = windows::show_panel(app);
+    let payload = ShortcutPayload {
+        action: if matches!(action, Action::Primary) {
+            "primary"
+        } else {
+            "secondary"
+        },
+        text,
+        error,
     };
     let _ = app.emit_to(windows::PANEL_LABEL, "shortcut", payload);
 }

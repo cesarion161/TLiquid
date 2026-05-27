@@ -149,24 +149,26 @@ open **Settings**. For first-time setup you'll mainly use three of its sections:
    selectable) and a **default model** (fetched live from the provider; if the
    list can't load you can type a model id manually).
 
-Then translate:
+Then translate. The **Target** selector is a sticky session choice: an explicit
+language is always used; **Auto** applies the primary/secondary rules
+(non-primary → primary; primary → secondary, or stays primary with no secondary).
 
-- **Manually:** open the panel, type/paste text, choose a target (*Auto* uses the
-  primary/secondary rules, or pick a specific language), press **Translate** (or
-  Enter). **Copy**, or press **Enter** to copy and dismiss the panel.
-- **Selected text (primary hotkey, ⌘⇧T):** select text in any app and press the
-  hotkey. TLiquid captures the selection, opens prefilled, and translates using
-  the routing rules: non-primary → primary; primary → secondary (or, with no
-  secondary, stays primary). Press **Enter** to copy and dismiss.
-- **Selected text (secondary hotkey, ⌘⇧⌥T):** always translates to the secondary
-  language. If no secondary is set, the panel opens **Settings** (the Languages
-  section is at the top).
-- **Open panel (⌘⌥T):** just summons the panel.
+- **Manually:** click the menu-bar icon to open the panel, type/paste text, set
+  the **Target**, press **Translate** (or Enter). **Copy**, or press **Enter** to
+  copy and dismiss the panel.
+- **Selected text (⌘⇧T):** select text in any app and press the hotkey — TLiquid
+  translates it to the current **Target**, opens prefilled, and shows the result;
+  press **Enter** to copy and dismiss. If **nothing is selected, it does nothing**
+  (no panel). If Accessibility permission isn't granted, it opens with guidance to
+  enable it.
+- **Translate to secondary (⌘⇧⌥T):** translates the selection to your secondary
+  language (and sets the Target to it). If no secondary is configured, the panel
+  opens to **Settings** (Languages is at the top).
 
-The panel drops down under the menu-bar icon and **auto-hides when it loses
-focus** (click outside or switch apps) — summon it again from the tray icon or a
-hotkey. Shortcuts can be toggled off entirely in **Settings → Shortcuts** (custom
-remapping is a later phase).
+The panel drops down under the menu-bar icon, **remembers where you drag it**, and
+**auto-hides when it loses focus** (click outside, switch apps, or press **Esc**) —
+re-open it from the tray icon (or the hotkey, with text selected). Shortcuts can be
+toggled off in **Settings → Shortcuts** (custom remapping is a later phase).
 
 ### How your API keys are stored
 
