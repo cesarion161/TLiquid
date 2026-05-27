@@ -59,7 +59,15 @@ export interface Settings {
     translateSecondary: string;
     enabled: boolean;
   };
-  providers: Record<ProviderId, { enabled: boolean; defaultModel: string | null }>;
+  providers: Record<
+    ProviderId,
+    {
+      enabled: boolean;
+      defaultModel: string | null;
+      /** Local server URL — Ollama only (P1-004); other providers leave it null. */
+      endpoint?: string | null;
+    }
+  >;
   defaultProvider: ProviderId;
   defaultModel: string | null;
   output: {

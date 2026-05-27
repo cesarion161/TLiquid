@@ -87,7 +87,12 @@ and the shared `TranslationRequest`/`TranslationResponse`/`ProviderMeta` types. 
 factory; `all()` builds the metadata list for the settings UI. The four cloud adapters (`openai.rs`,
 `anthropic.rs`, `gemini.rs`, `openrouter.rs`) make **real** direct BYOK HTTP calls (P0-008) through the shared
 `http.rs` helpers — one pooled `reqwest` client + status→message normalization that never leaks the key (it
-strips the URL from transport errors and ignores auth-error bodies). `ollama.rs` stays a Phase 1 stub (P1-004).
+strips the URL from transport errors and ignores auth-error bodies). `ollama.rs` is a **real local adapter**
+(P1-004): it talks to a local Ollama server (`/api/tags` for models, `/api/chat` for translation, NDJSON
+streaming via `http::stream_ndjson`), is `available()` + `supports_streaming()`, and is **keyless** — it's
+addressed by an endpoint URL (`config::Providers::ollama_endpoint`, default `http://localhost:11434`) which the
+orchestrator passes through the same `api_key` slot the cloud adapters use for their key (`commands::provider_credential`
+resolves Keychain-key vs endpoint), so the `Provider` trait stays unchanged.
 `Provider::translate` returns just the completion **text**; the orchestrator (`commands::translate` →
 `translation::build_prompt`) resolves routing, builds the `Prompt`, times the call, and assembles the
 `TranslationResponse` — so adapters stay response-agnostic and error/latency logic lives in one place.
@@ -106,4 +111,4 @@ non-streaming `commands::translate`): it wraps a Tauri `ipc::Channel<Translation
 frontend (`Translate.svelte`) creates the `Channel`, appends `{text}` deltas as they arrive, then settles on the
 returned trimmed text. **The non-streaming `translate` command/path remains the fallback** — the frontend uses it
 for providers whose `supportsStreaming` is `false`, and the trait's default `translate_stream` also degrades to one
-`translate` call. Ollama still streams nothing (`supports_streaming() == false`); its NDJSON streaming is P1-004.
+`translate` call. Ollama also streams (NDJSON via `http::stream_ndjson`, P1-004).

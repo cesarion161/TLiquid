@@ -80,11 +80,33 @@ pub struct Providers {
     pub ollama: ProviderConfig,
 }
 
+/// Default Ollama server, used when `providers.ollama.endpoint` is unset/blank.
+pub const DEFAULT_OLLAMA_ENDPOINT: &str = "http://localhost:11434";
+
+impl Providers {
+    /// The configured local Ollama endpoint, or the default (P1-004). Unlike the
+    /// cloud providers, Ollama is keyless and addressed by URL; this is the
+    /// "credential" the orchestrator hands its adapter.
+    pub fn ollama_endpoint(&self) -> String {
+        self.ollama
+            .endpoint
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .unwrap_or(DEFAULT_OLLAMA_ENDPOINT)
+            .to_string()
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderConfig {
     pub enabled: bool,
     pub default_model: Option<String>,
+    /// Local server URL — Ollama only (other providers leave this `None`).
+    /// Defaulted so settings files written before P1-004 still load (FR-049).
+    #[serde(default)]
+    pub endpoint: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -131,7 +153,15 @@ impl Default for Settings {
                 translate_secondary: "Cmd+Shift+Option+T".into(),
                 enabled: true,
             },
-            providers: Providers::default(),
+            providers: Providers {
+                // Seed the default Ollama endpoint so the UI shows it from the
+                // first run; the cloud providers stay at their derived defaults.
+                ollama: ProviderConfig {
+                    endpoint: Some(DEFAULT_OLLAMA_ENDPOINT.to_string()),
+                    ..ProviderConfig::default()
+                },
+                ..Providers::default()
+            },
             default_provider: ProviderId::Openai,
             default_model: None,
             output: Output {
@@ -273,6 +303,16 @@ mod tests {
         }"#;
         let shortcuts: Shortcuts = serde_json::from_str(json).unwrap();
         assert!(shortcuts.enabled);
+    }
+
+    #[test]
+    fn ollama_endpoint_falls_back_to_default_when_unset_or_blank() {
+        let mut p = Providers::default(); // endpoint None
+        assert_eq!(p.ollama_endpoint(), DEFAULT_OLLAMA_ENDPOINT);
+        p.ollama.endpoint = Some("   ".into()); // blank → default
+        assert_eq!(p.ollama_endpoint(), DEFAULT_OLLAMA_ENDPOINT);
+        p.ollama.endpoint = Some("http://10.0.0.2:11434".into());
+        assert_eq!(p.ollama_endpoint(), "http://10.0.0.2:11434");
     }
 
     #[test]

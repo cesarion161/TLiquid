@@ -49,19 +49,52 @@ pub async fn send_json<T: DeserializeOwned>(
         .map_err(|_| AppError::Provider(format!("{provider}: could not parse the response.")))
 }
 
-/// Stream a Server-Sent Events response (P1-009). Sends `request`, normalizes a
-/// non-success status exactly like [`send_json`] (so a 401 streaming request
-/// still yields the no-key-leak message), then reads the body incrementally and
-/// invokes `on_data` once per `data:` payload line — excluding the `[DONE]`
-/// sentinel and empty keep-alive lines. Adapters parse each payload themselves,
-/// so this stays provider-neutral.
-///
-/// Bytes are buffered and only decoded a full line at a time, so a multi-byte
-/// UTF-8 character split across two network chunks is never corrupted.
+/// Stream a Server-Sent Events response (P1-009; cloud providers). Reads the
+/// body line by line and invokes `on_data` once per `data:` payload — excluding
+/// the `[DONE]` sentinel and `event:`/comment/blank lines. Adapters parse each
+/// payload themselves, so this stays provider-neutral.
 pub async fn stream_sse(
     provider: &str,
     request: reqwest::RequestBuilder,
     mut on_data: impl FnMut(&str) -> Result<()>,
+) -> Result<()> {
+    read_lines(provider, request, |line| match sse_data_payload(line) {
+        Some(payload) => on_data(payload),
+        None => Ok(()),
+    })
+    .await
+}
+
+/// Stream a newline-delimited JSON response (P1-004; Ollama). Invokes `on_line`
+/// once per non-empty line (the whole JSON object); the adapter parses it.
+pub async fn stream_ndjson(
+    provider: &str,
+    request: reqwest::RequestBuilder,
+    mut on_line: impl FnMut(&str) -> Result<()>,
+) -> Result<()> {
+    read_lines(provider, request, |line| {
+        let line = line.trim();
+        if line.is_empty() {
+            Ok(())
+        } else {
+            on_line(line)
+        }
+    })
+    .await
+}
+
+/// Shared line reader for the streaming protocols above. Sends `request`,
+/// normalizes a non-success status exactly like [`send_json`] (so a 401
+/// streaming request still yields the no-key-leak message), then reads the body
+/// incrementally and invokes `on_line` once per complete line (trailing CR/LF
+/// stripped).
+///
+/// Bytes are buffered and only decoded a full line at a time, so a multi-byte
+/// UTF-8 character split across two network chunks is never corrupted.
+async fn read_lines(
+    provider: &str,
+    request: reqwest::RequestBuilder,
+    mut on_line: impl FnMut(&str) -> Result<()>,
 ) -> Result<()> {
     use futures_util::StreamExt;
 
@@ -88,13 +121,11 @@ pub async fn stream_sse(
         while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
             let line: Vec<u8> = buf.drain(..=pos).collect();
             let line = String::from_utf8_lossy(&line);
-            if let Some(payload) = sse_data_payload(&line) {
-                on_data(payload)?;
-            }
+            on_line(line.trim_end_matches(['\r', '\n']))?;
         }
         // Guard against a non-conformant endpoint streaming an unbounded line
         // with no newline (only the in-progress partial line is ever buffered).
-        if buf.len() > MAX_SSE_LINE_BYTES {
+        if buf.len() > MAX_STREAM_LINE_BYTES {
             return Err(AppError::Provider(format!(
                 "{provider}: streaming response line exceeded the size limit."
             )));
@@ -104,16 +135,14 @@ pub async fn stream_sse(
     // last delta isn't lost on a stream that doesn't end with a blank line.
     if !buf.is_empty() {
         let line = String::from_utf8_lossy(&buf);
-        if let Some(payload) = sse_data_payload(&line) {
-            on_data(payload)?;
-        }
+        on_line(line.trim_end_matches(['\r', '\n']))?;
     }
     Ok(())
 }
 
-/// Cap on a single un-terminated SSE line held in the read buffer. Translation
+/// Cap on a single un-terminated stream line held in the read buffer. Translation
 /// chunks are tiny; this only bounds a pathological newline-less stream.
-const MAX_SSE_LINE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_STREAM_LINE_BYTES: usize = 8 * 1024 * 1024;
 
 /// Extract the `data:` payload of a single SSE line, if it carries real data.
 /// Returns `None` for `event:`/comment/blank lines, the `[DONE]` sentinel, and

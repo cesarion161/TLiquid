@@ -94,23 +94,34 @@ pub async fn test_provider_key(provider: ProviderId, key: String) -> Result<bool
     providers::adapter(provider).validate_key(&key).await
 }
 
-/// Test the connection using the provider's already-saved key (FR-040), reading
-/// it from the Keychain so the frontend never has to hold a saved key.
+/// The connection credential an adapter needs: the Keychain API key for the
+/// cloud providers, or the configured endpoint URL for Ollama (local, keyless —
+/// P1-004). Keeps the [`providers::Provider`] trait unchanged: Ollama just
+/// receives its base URL in the slot the cloud adapters use for the key.
+fn provider_credential(app: &AppHandle, provider: ProviderId) -> Result<String> {
+    if provider == ProviderId::Ollama {
+        Ok(config::load(app).providers.ollama_endpoint())
+    } else {
+        secrets::get_key(provider.as_str())?.ok_or_else(|| {
+            AppError::Provider(format!("No API key configured for {}.", provider.as_str()))
+        })
+    }
+}
+
+/// Test the connection using the provider's saved credential (FR-040): the
+/// Keychain key for cloud providers, or the configured Ollama endpoint. Reads it
+/// in the backend so the frontend never has to hold a saved key.
 #[tauri::command]
-pub async fn test_provider_connection(provider: ProviderId) -> Result<bool> {
-    let key = secrets::get_key(provider.as_str())?.ok_or_else(|| {
-        AppError::Provider(format!("No API key configured for {}.", provider.as_str()))
-    })?;
-    providers::adapter(provider).validate_key(&key).await
+pub async fn test_provider_connection(app: AppHandle, provider: ProviderId) -> Result<bool> {
+    let credential = provider_credential(&app, provider)?;
+    providers::adapter(provider).validate_key(&credential).await
 }
 
 /// List the models a configured provider offers, for the model picker (FR-041).
 #[tauri::command]
-pub async fn list_provider_models(provider: ProviderId) -> Result<Vec<String>> {
-    let key = secrets::get_key(provider.as_str())?.ok_or_else(|| {
-        AppError::Provider(format!("No API key configured for {}.", provider.as_str()))
-    })?;
-    providers::adapter(provider).list_models(&key).await
+pub async fn list_provider_models(app: AppHandle, provider: ProviderId) -> Result<Vec<String>> {
+    let credential = provider_credential(&app, provider)?;
+    providers::adapter(provider).list_models(&credential).await
 }
 
 /// Resolve routing → build the provider-neutral prompt → look up the Keychain
@@ -128,13 +139,9 @@ fn prepare(
         request.explicit_target_language.clone(),
         &request.source_text,
     )?;
-    let key = secrets::get_key(request.provider.as_str())?.ok_or_else(|| {
-        AppError::Provider(format!(
-            "No API key configured for {}.",
-            request.provider.as_str()
-        ))
-    })?;
-    Ok((plan, key))
+    // The "credential" is the Keychain key (cloud) or the Ollama endpoint (local).
+    let credential = provider_credential(app, request.provider)?;
+    Ok((plan, credential))
 }
 
 /// Assemble the final response from a completed (streamed or not) provider call.

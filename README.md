@@ -164,10 +164,13 @@ open **Settings**. For first-time setup you'll mainly use three of its sections:
 2. **Providers** — paste an API key for **OpenAI**, **Anthropic**, **Gemini**, or
    **OpenRouter**, then **Save**. Use **Test** to verify the key; the status reads
    *Configured*, *Connection OK*, or *Invalid key* — or shows the provider error
-   if the connection fails. **Remove** deletes the key from the Keychain.
-3. **Models** — pick the **default provider** (only providers with a saved key are
-   selectable) and a **default model** (fetched live from the provider; if the
-   list can't load you can type a model id manually).
+   if the connection fails. **Remove** deletes the key from the Keychain. For
+   **Ollama** (local), there's no key — set the **endpoint URL** (default
+   `http://localhost:11434`), **Save**, and **Test** that the server is reachable.
+3. **Models** — pick the **default provider** (only providers with a saved key —
+   or Ollama — are selectable) and a **default model** (fetched live from the
+   provider; if the list can't load, or you haven't pulled an Ollama model yet,
+   you can type a model id manually).
 
 Then translate. The **Target** selector is a sticky session choice: an explicit
 language is always used; **Auto** applies the primary/secondary rules
@@ -277,10 +280,12 @@ translation and is disclosed here intentionally.
   can't be preserved. A selection identical to the current clipboard reads as
   "no selection."
 - **Unsigned build** — see the Gatekeeper bypass above.
-- **Streaming output** (P1-009): translations from the cloud providers stream in
-  incrementally; press **Enter** once it finishes to copy the complete text.
-  (Local models will stream once Ollama lands in P1-004.)
-- **Local models (Ollama)** are not available yet (Phase 1).
+- **Streaming output** (P1-009): translations stream in incrementally (cloud
+  providers and Ollama); press **Enter** once it finishes to copy the complete text.
+- **Local models (Ollama)** (P1-004): run a local Ollama server, set its endpoint
+  in **Settings → Providers**, and translate with no cloud key. Requires Ollama
+  installed and a model pulled (`ollama pull <model>`); errors are shown if the
+  server is unreachable.
 - The result's target-language label is best-effort in Auto/primary mode (the
   model picks the real target from the detected source).
 
