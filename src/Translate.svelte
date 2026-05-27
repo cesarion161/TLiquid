@@ -53,6 +53,9 @@
   // Provider metadata (static), fetched once, used to decide whether to stream.
   let providerMeta: ProviderMeta[] | null = null;
   let providerMetaPromise: Promise<ProviderMeta[]> | null = null;
+  // Monotonic id per translation run; the streaming channel handler checks it so
+  // late deltas from a superseded run can never write into a newer result.
+  let runId = 0;
   let sourceText = $state("");
   let targetValue = $state("auto"); // "auto" (primary routing) or a language code
   let translating = $state(false);
@@ -155,6 +158,7 @@
     output = null;
     permissionHelp = false; // a provider error is not a permission problem
     translating = true;
+    const myRun = ++runId;
     const req = {
       sourceText: text,
       routingMode: mode,
@@ -172,6 +176,7 @@
         output = "";
         const channel = new Channel<TranslationDelta>();
         channel.onmessage = (d) => {
+          if (myRun !== runId) return; // ignore deltas from a superseded run
           output = (output ?? "") + d.text;
         };
         const resp = await translateStream(req, channel);

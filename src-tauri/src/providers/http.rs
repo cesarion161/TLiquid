@@ -92,13 +92,32 @@ pub async fn stream_sse(
                 on_data(payload)?;
             }
         }
+        // Guard against a non-conformant endpoint streaming an unbounded line
+        // with no newline (only the in-progress partial line is ever buffered).
+        if buf.len() > MAX_SSE_LINE_BYTES {
+            return Err(AppError::Provider(format!(
+                "{provider}: streaming response line exceeded the size limit."
+            )));
+        }
+    }
+    // Flush a final line that ended at EOF without a trailing newline, so the
+    // last delta isn't lost on a stream that doesn't end with a blank line.
+    if !buf.is_empty() {
+        let line = String::from_utf8_lossy(&buf);
+        if let Some(payload) = sse_data_payload(&line) {
+            on_data(payload)?;
+        }
     }
     Ok(())
 }
 
+/// Cap on a single un-terminated SSE line held in the read buffer. Translation
+/// chunks are tiny; this only bounds a pathological newline-less stream.
+const MAX_SSE_LINE_BYTES: usize = 8 * 1024 * 1024;
+
 /// Extract the `data:` payload of a single SSE line, if it carries real data.
-/// Returns an empty iterator for `event:`/comment/blank lines, the `[DONE]`
-/// sentinel, and empty payloads. Pure, so it is unit-tested.
+/// Returns `None` for `event:`/comment/blank lines, the `[DONE]` sentinel, and
+/// empty payloads. Pure, so it is unit-tested.
 fn sse_data_payload(line: &str) -> Option<&str> {
     let line = line.trim_end_matches(['\r', '\n']);
     let data = line.strip_prefix("data:")?.trim();
@@ -257,6 +276,8 @@ mod tests {
         assert_eq!(sse_data_payload("data: {\"a\":1}\n"), Some("{\"a\":1}"));
         // Tolerates a missing space after the colon and CRLF endings.
         assert_eq!(sse_data_payload("data:{\"a\":1}\r\n"), Some("{\"a\":1}"));
+        // A trailing line with no newline (the EOF-flush case) still parses.
+        assert_eq!(sse_data_payload("data: {\"a\":1}"), Some("{\"a\":1}"));
     }
 
     #[test]
