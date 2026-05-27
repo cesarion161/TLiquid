@@ -25,7 +25,15 @@
     error: string | null;
     id: number;
   };
-  let { request = null }: { request?: ShortcutRequest | null } = $props();
+  let {
+    request = null,
+    onOpenSettings,
+  }: {
+    request?: ShortcutRequest | null;
+    // Called when the secondary hotkey fires but no secondary language is
+    // configured — App switches to the Settings view (P0-015, PRD §10.3).
+    onOpenSettings?: () => void;
+  } = $props();
 
   let settings = $state<Settings | null>(null);
   let settingsPromise: Promise<Settings> | null = null;
@@ -120,14 +128,20 @@
     runTranslation(sourceText, mode, explicit);
   }
 
-  // A selected-text hotkey capture arrived: prefill the source and translate
-  // using the action's routing rules (primary or secondary). `handledId` (a
-  // plain, untracked local) ensures each request runs once.
+  // A selected-text hotkey capture arrived. `handledId` (a plain, untracked
+  // local) ensures each request runs once.
   let handledId: number | undefined;
   $effect(() => {
     const req = request;
     if (!req || req.id === handledId) return;
     handledId = req.id;
+    handleRequest(req);
+  });
+
+  // Prefill the source and translate per the action's routing rules. For the
+  // secondary hotkey with no secondary language configured, redirect to Settings
+  // instead of erroring (PRD §10.3).
+  async function handleRequest(req: ShortcutRequest) {
     if (req.error) {
       // Capture failed: show the reason and clear any prior result/source so
       // stale text doesn't linger under the error.
@@ -137,15 +151,23 @@
       copied = false;
       return;
     }
-    if (req.text != null) {
-      sourceText = req.text;
-      output = null;
-      copied = false;
-      error = null;
-      const mode: RoutingMode = req.action === "secondary" ? "secondary" : "primary";
-      runTranslation(req.text, mode, null);
+    if (req.text == null) return;
+
+    if (req.action === "secondary") {
+      const s = await ensureSettings();
+      if (s && !s.languages.secondary) {
+        onOpenSettings?.();
+        return;
+      }
     }
-  });
+
+    sourceText = req.text;
+    output = null;
+    copied = false;
+    error = null;
+    const mode: RoutingMode = req.action === "secondary" ? "secondary" : "primary";
+    runTranslation(req.text, mode, null);
+  }
 
   async function copy() {
     if (!output) return;

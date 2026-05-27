@@ -100,6 +100,13 @@
     <!-- Manual translation surface (PRD §10.4/§10.5). Owns its own state and the
          real provider call; remounts on each switch back so it re-reads settings.
          `request` carries a selected-text hotkey capture to translate (P0-014/15). -->
-    <Translate request={shortcutRequest} />
+    <Translate
+      request={shortcutRequest}
+      onOpenSettings={() => {
+        view = "settings";
+        // Drop the handled request so returning to translate doesn't bounce back.
+        shortcutRequest = null;
+      }}
+    />
   {/if}
 </div>
