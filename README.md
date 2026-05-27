@@ -133,6 +133,16 @@ paid Apple Developer account, which this MVP doesn't assume. An unsigned local
 build is acceptable for internal testing — use the Gatekeeper bypass above.
 Producing a signed, notarized release is tracked as **P1-008**.
 
+> **Heads-up — Accessibility permission resets on each rebuild.** Unsigned (ad-hoc)
+> builds get a *new* code identity every time they're built, and macOS ties the
+> Accessibility grant to that identity. So after rebuilding, the existing "TLiquid"
+> entry in **Privacy & Security → Accessibility** becomes stale and capture re-prompts
+> even though it looks enabled — **remove it (select it, press “−”) and grant again**.
+> To make the grant persist across rebuilds during development, sign with a *stable*
+> identity (e.g. a self-signed code-signing cert created in Keychain Access, then set
+> `APPLE_SIGNING_IDENTITY="<cert name>"` before `pnpm tauri build`). A real Developer ID
+> signature (P1-008) fixes this for releases.
+
 ## Using TLiquid
 
 Click the menu-bar icon to open the panel; click the **⚙ gear** (top-right) to
@@ -260,10 +270,13 @@ translation and is disclosed here intentionally.
 
 ## Troubleshooting
 
-- **Nothing happens on the hotkey / "No text was captured":** grant **Accessibility**
-  permission (System Settings → Privacy & Security → Accessibility); the app's
-  error offers a one-click button to that pane. Make sure text is actually
-  selected and the app supports Copy. Use the manual panel as a fallback.
+- **Nothing happens on the hotkey:** if text *is* selected, that's the intended
+  no-op only when nothing is selected — otherwise grant **Accessibility** permission
+  (System Settings → Privacy & Security → Accessibility; the error offers a one-click
+  button). Make sure the app supports Copy; use the manual panel as a fallback.
+- **It keeps asking for Accessibility even though TLiquid is enabled in the list:**
+  the entry is stale from a previous build — **remove it (select it, press “−”) and
+  re-grant**. Unsigned builds get a new identity each rebuild (see "Signing" above).
 - **"Invalid key" or a connection error:** re-check the key in Settings → Providers
   and **Test** it; confirm network access and that the provider/model is available.
 - **No models to choose / list won't load:** the provider's model API may be

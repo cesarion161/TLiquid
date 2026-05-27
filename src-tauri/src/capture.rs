@@ -62,10 +62,12 @@ pub fn capture_selection(app: &AppHandle) -> Capture {
         Ok(enigo) => enigo,
         Err(NewConError::NoPermission) => {
             return Capture::Failed(
-                "TLiquid needs Accessibility permission to read the selection. Grant it in \
-                 System Settings → Privacy & Security → Accessibility, then try again. If \
-                 TLiquid isn't listed there, run the installed TLiquid.app — capture can't work \
-                 when launched from a terminal or `tauri dev`."
+                "TLiquid needs Accessibility permission to read the selection (System Settings → \
+                 Privacy & Security → Accessibility). If TLiquid is already listed and enabled, \
+                 it's likely a stale entry from a previous build — select it, press “−” to remove \
+                 it, then try again and re-grant. (Unsigned builds get a new identity each rebuild, \
+                 so the old grant no longer applies. Also: capture only works from the built \
+                 TLiquid.app, not a terminal / `tauri dev`.)"
                     .into(),
             );
         }
