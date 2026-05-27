@@ -262,3 +262,118 @@ permission / non-interactive session for this process), and the WKWebView doesn'
 without an interactive session. **Visual UI verification + screenshots require your
 interactive Mac session** (the §7 checklist, plus a glance at the new bell/badge and the
 empty-panel-on-no-selection behavior).
+
+---
+
+# TLiquid — Phase 2 QA / Release Candidate report (P2-011)
+
+Date: 2026-05-27 · Branch: `main` · Version: 0.1.0 (macOS, Apple Silicon)
+
+Phase 2 end-to-end QA pass. **macOS-focused scope** (per the 2026-05-27 roadmap
+revision in `tliquid_todo.md` §5): **P2-007** manual update check + click-to-install,
+**P2-013** automatic update-check polling, **P2-012** modern UI (translucency,
+resizable window, overlay panes). Out of scope: Windows (P2-001/002/003/009 →
+Phase 3+), hosted proxy/account/billing/diagnostics-backend (P2-004/005/006/008 →
+future, infra-gated), and translation history (P2-010 → postponed).
+
+## 1. Automated gate (matches CI, `.github/workflows/ci.yml`) — all green
+
+| Step | Result |
+|---|---|
+| `pnpm check` (svelte-check) | ✅ 0 errors, 0 warnings (126 files) |
+| `cargo fmt --check` | ✅ clean |
+| `cargo clippy --all-targets -- -D warnings` | ✅ clean |
+| `cargo test` | ✅ 79 passed, 0 failed (was 78 in Phase 1; +1 updates-back-compat test) |
+| `pnpm tauri build --no-bundle` | ✅ release builds, "Built application" |
+
+New Phase 2 test coverage: the `updates` settings back-compat default
+(`config::settings_without_updates_field_default_to_auto_check_on`). The existing
+privacy guards (host allowlist, `reqwest` confinement, no-key-in-error, diagnostics
+no-secret-fields) and all Phase 0/1 tests still pass.
+
+## 2. IPC surface — fully wired (25 commands)
+
+All 25 `#[tauri::command]` functions are **defined == registered in `invoke_handler!`
+(`lib.rs`) == typed-wrapped in `src/lib/tauri.ts`** — cross-checked, **zero mismatches**
+(25/25/25). New since Phase 1 (+3): `check_for_update`, `download_and_install_update`
+(P2-007), `set_translucency` (P2-012). P2-013 added no command (the background poll
+reuses the in-process `updater::check`; the panel learns of a found update via the
+`update-available` event, not an `invoke`).
+
+## 3. Build / boot
+
+- `pnpm tauri build --no-bundle` builds the release binary clean (transparent
+  window + `app.macOSPrivateApi` + the `macos-private-api` tauri feature +
+  `window-vibrancy` all compile in release).
+- **No interactive display in this environment**, so the WKWebView can't mount and
+  the new visuals (vibrancy, resize behavior, the sliding overlay panes) **cannot be
+  inspected or screenshotted here** — they need the owner's interactive Mac session
+  (§7). The frontend builds clean (svelte-check 0).
+
+## 4. Per-task QA coverage
+
+| Task | Verified automatically / by build / by review | Requires on-device (real release / display) |
+|---|---|---|
+| **P2-007 manual update** | `updater::check`/`download_and_install` logic; `PendingUpdate` state + lock-not-held-across-await; minisign pubkey embedded; `check_for_update`/`download_and_install_update` wired; AboutSettings/Notifications/bell UI; `release.yml` signs updater artifacts only when the key is present (reviewed) | **Full loop against a published GitHub release:** Check → *Update available vX* → Download & install → minisign-verify → relaunch into the new version |
+| **P2-013 auto-check** | `updater::start_auto_check` (10s startup delay → 3h loop, re-reads `auto_check` each tick), emits `update-available`; `updates.auto_check` default ON + back-compat test; README/audit-comment disclose the FR-056 exception (reviewed APPROVE) | Background poll lighting the bell on a real newer release; toggle off → no polling; manual check still works |
+| **P2-012 UI** | Window `transparent`+`resizable`+`min_inner_size`; `window-vibrancy` applied per `ui.translucent` (default ON); `set_translucency` persist+apply; size persisted independently of position (back-compat); overlay panes (z-index, scrim, Esc precedence) + proportional flex layout reviewed APPROVE | **Visual:** glass look + Reduce-Transparency fallback; resize never below min + proportional growth + size remembered; Settings/Notifications slide over as a fixed-width pane; toggle translucency off → solid |
+
+## 5. Privacy / no-telemetry (re-confirmed for Phase 2)
+
+- **New, disclosed network call:** the update check contacts **only GitHub**
+  (`…/releases/latest/download/latest.json`), sends no user data, and is
+  **check-only** (never auto-installs). It is the documented exception to the
+  Phase-0/1 "no automatic update checks" promise (FR-056), is **opt-out** (Settings
+  → Updates, default ON), and is disclosed in the README Privacy section, CLAUDE.md,
+  and the `providers/mod.rs` privacy-audit comment.
+- It is a **separate surface** from the provider layer: it uses the Tauri updater
+  plugin's own client, not our `reqwest`, so the `reqwest`-confinement and
+  provider-host-allowlist tests still hold and pass.
+- No telemetry/analytics. The minisign **private** key is gitignored (`.tauri/`) and
+  never committed; only the public key is embedded in `tauri.conf.json`.
+
+## 6. Blockers / items requiring owner action
+
+- **The update flow can't be exercised end-to-end here.** It needs (a) the
+  `TAURI_SIGNING_PRIVATE_KEY` secret set in the repo, and (b) a **published**
+  (non-draft) GitHub release carrying signed `*.app.tar.gz` + `latest.json` — and
+  `/releases/latest/` only serves *published* releases, so the tag-triggered draft
+  must be published first (documented in `docs/BUILD.md` §6). Until a release newer
+  than the running version exists, "Check for updates" correctly reports *Up to date*.
+- **Interactive UI / visual verification needs the owner's Mac** (no display here):
+  vibrancy look + Reduce-Transparency behavior, resize/min/proportional layout +
+  size persistence, and the overlay-pane slide/scrim/Esc.
+
+## 7. Manual QA checklist (Phase 2 — needs a Mac; the update loop needs a published release)
+
+- [ ] **Manual update:** with a published release newer than the installed version,
+      Settings → Updates → **Check for updates** shows *Update available: vX.Y.Z*; the
+      🔔 bell lights and Notifications shows the same; **Download & install** downloads
+      (progress shown), verifies, installs in place, and **relaunches** into the new
+      version. With no newer release → *Up to date (vX)*.
+- [ ] **Auto-check:** with auto-check ON (default), after startup (or within 3h) a
+      newer release lights the bell automatically (no download/install happens).
+      Toggle **Automatically check for new updates** OFF → no background polling, but
+      the manual button still works.
+- [ ] **Translucency:** the panel shows a frosted "glass" background; Settings →
+      Appearance → toggle off → solid background; enable macOS *Reduce transparency* →
+      becomes solid automatically.
+- [ ] **Resizable:** drag an edge to enlarge — it won't shrink below the compact
+      default; the input and translation areas grow proportionally; the size is
+      remembered after relaunch (alongside the dragged position).
+- [ ] **Overlay panes:** opening Settings/Notifications slides a fixed-width pane over
+      part of the translate view (not a full-window takeover); clicking outside the
+      pane or pressing **Esc** closes it (a second Esc, from translate, hides the panel).
+- [ ] Re-confirm (Activity Monitor / proxy) that the only non-provider traffic is the
+      GitHub update check, and only when checking.
+
+## 8. Verdict
+
+Phase 2 is a **release candidate**: every automated gate is green (79 tests), the IPC
+surface is fully aligned (25/25/25 commands), and the release binary builds with the new
+transparent-window/vibrancy stack. All three in-scope tasks — **P2-007** (manual update),
+**P2-013** (auto-check), **P2-012** (UI refresh) — are **done** and peer-reviewed (each
+implemented → fresh-context review → fix). Sign-off is pending the §7 on-device checklist:
+the live update loop (which needs the signing secret + a published release) and the visual
+UI checks (which need an interactive Mac). Windows, hosted/paid features, and translation
+history remain out of scope per the macOS-focused roadmap.
