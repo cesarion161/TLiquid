@@ -176,12 +176,31 @@ gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body ''
 
 ### 6.2 How a release produces updates
 
-With `bundle.createUpdaterArtifacts: true` (set in `tauri.conf.json`) and the
-signing secret present, the release workflow:
+`createUpdaterArtifacts` is deliberately **kept out of the base
+`tauri.conf.json`**: with a `pubkey` configured, the bundler hard-requires
+`TAURI_SIGNING_PRIVATE_KEY` whenever that flag is on, which would break the
+unsigned local build (§3) and fork CI. It is instead enabled by a partial-config
+override, `src-tauri/tauri.updater.conf.json`, applied **only when the signing
+key is present**:
+
+- **In CI** (`release.yml`): the "Enable signed updater artifacts" step adds
+  `--config src-tauri/tauri.updater.conf.json` to the build only when
+  `TAURI_SIGNING_PRIVATE_KEY` is set. No key → no override → unsigned build with
+  no updater artifacts (still succeeds, so forks work).
+- **Locally** (`scripts/build-macos.sh`): the same override is added
+  automatically when `TAURI_SIGNING_PRIVATE_KEY` (or `_PATH`) is exported, e.g.:
+
+  ```bash
+  export TAURI_SIGNING_PRIVATE_KEY="$(cat .tauri/tliquid_updater.key)"
+  export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=''
+  scripts/build-macos.sh           # prints "updater: artifacts"
+  ```
+
+When enabled, the build:
 
 1. builds the `.app.tar.gz` updater bundle and signs it (`.sig`);
 2. generates `latest.json` (version + per-target download URL + signature);
-3. uploads both to the GitHub Release.
+3. (in CI) uploads both to the GitHub Release.
 
 The app's updater endpoint is
 `https://github.com/cesarion161/TLiquid/releases/latest/download/latest.json`.

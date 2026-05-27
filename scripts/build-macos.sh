@@ -68,9 +68,22 @@ if [[ "$notarize" != "off" && "$signing" == "unsigned" ]]; then
 	exit 1
 fi
 
-echo "TLiquid macOS build  •  signing: ${signing}  •  notarization: ${notarize}"
+# --- detect updater signing ---------------------------------------------------
+# Updater artifacts (.app.tar.gz + latest.json) are produced only when the
+# minisign private key is present, via a partial-config override. The base
+# tauri.conf.json deliberately omits `createUpdaterArtifacts` so a plain unsigned
+# build never requires the key (see docs/BUILD.md §6 and .github/workflows/release.yml).
+updater="off"
+updater_args=()
+if [[ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" || -n "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]]; then
+	updater="artifacts"
+	updater_args=(--config src-tauri/tauri.updater.conf.json)
+fi
+
+echo "TLiquid macOS build  •  signing: ${signing}  •  notarization: ${notarize}  •  updater: ${updater}"
 [[ "$signing" == "unsigned" ]] && \
 	echo "note: unsigned build — recipients must bypass Gatekeeper (see README)."
 
-# Tauri reads the APPLE_* vars itself; we just invoke the build.
-exec pnpm tauri build "$@"
+# Tauri reads the APPLE_* / TAURI_SIGNING_* vars itself; we just invoke the build,
+# adding the updater-artifacts override only when the signing key is set.
+exec pnpm tauri build "${updater_args[@]}" "$@"

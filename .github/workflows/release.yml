@@ -22,6 +22,7 @@ jobs:
     env:
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_API_KEY_PATH_B64: ${{ secrets.APPLE_API_KEY_PATH_B64 }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -82,6 +83,15 @@ jobs:
           echo "$APPLE_API_KEY_PATH_B64" | base64 --decode > "$RUNNER_TEMP/apple_api_key.p8"
           echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/apple_api_key.p8" >> "$GITHUB_ENV"
 
+      # Generate signed updater artifacts (.app.tar.gz + latest.json) only when
+      # the minisign private key is present. `createUpdaterArtifacts` stays OUT of
+      # the base tauri.conf.json on purpose: with a `pubkey` configured, the
+      # bundler hard-requires TAURI_SIGNING_PRIVATE_KEY, which would break unsigned
+      # local builds and fork CI. We opt in via a partial-config override only here.
+      - name: Enable signed updater artifacts
+        if: ${{ env.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: echo "UPDATER_ARGS=--config src-tauri/tauri.updater.conf.json" >> "$GITHUB_ENV"
+
       # tauri-action signs when APPLE_SIGNING_IDENTITY is in the env (set by the
       # import step above) and notarizes when the API-key vars are present; with
       # neither it builds unsigned. APPLE_SIGNING_IDENTITY / APPLE_API_KEY_PATH
@@ -93,13 +103,18 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           # Updater (P2-007): sign the `.app.tar.gz` with the minisign private key
-          # and upload `latest.json` to the release. Distinct from the Apple cert
-          # above — updates are verified by the pubkey in tauri.conf.json, so they
-          # work even on an unsigned build. With no secret set, the build still
-          # succeeds but produces no signed updater artifacts (no auto-updates).
+          # and upload `latest.json`. Distinct from the Apple cert above — updates
+          # are verified by the pubkey in tauri.conf.json, so they work even on an
+          # unsigned build. `TAURI_SIGNING_PRIVATE_KEY` is read by the bundler ONLY
+          # when the "Enable signed updater artifacts" step above added the
+          # --config override (i.e. when the secret is set). With no secret, that
+          # step is skipped, no updater artifacts are produced, and the build
+          # succeeds unsigned (so this workflow still runs in a fork).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          # Empty unless the updater-artifacts step set it (key present).
+          args: ${{ env.UPDATER_ARGS }}
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: 'TLiquid ${{ github.ref_name }}'
           releaseDraft: true

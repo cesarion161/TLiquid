@@ -26,7 +26,6 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
     "targets": ["app", "dmg"],
     "category": "public.app-category.productivity",
     "shortDescription": "BYOK LLM translator in your menu bar.",
