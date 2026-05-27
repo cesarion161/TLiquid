@@ -30,7 +30,23 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "minimumSystemVersion": "12.0"
+      "minimumSystemVersion": "12.0",
+      "hardenedRuntime": true,
+      "entitlements": "Entitlements.plist",
+      "dmg": {
+        "windowSize": {
+          "width": 540,
+          "height": 380
+        },
+        "appPosition": {
+          "x": 150,
+          "y": 190
+        },
+        "applicationFolderPosition": {
+          "x": 390,
+          "y": 190
+        }
+      }
     }
   }
 }

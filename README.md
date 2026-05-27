@@ -77,6 +77,10 @@ pnpm tauri build --no-bundle
 
 # Full macOS bundle (.app + .dmg in src-tauri/target/release/bundle)
 pnpm tauri build
+
+# Official build entry point: builds + signs + notarizes when APPLE_* env vars
+# are set, otherwise an unsigned build (see docs/BUILD.md)
+scripts/build-macos.sh
 ```
 
 ## Install (macOS)
@@ -126,12 +130,18 @@ macOS prompts the first time you use a translation hotkey; grant TLiquid access 
 one-click shortcut to that pane when a capture fails.) Manual translation in the
 panel needs no special permission.
 
-### Signing & notarization (deferred)
+### Signing & notarization
 
-Code signing and notarization are **deferred in Phase 0** (FR-075): they require a
-paid Apple Developer account, which this MVP doesn't assume. An unsigned local
-build is acceptable for internal testing — use the Gatekeeper bypass above.
-Producing a signed, notarized release is tracked as **P1-008**.
+The build pipeline **supports** signing and notarization (Hardened Runtime +
+`Entitlements.plist`, env-driven), but producing a signed artifact requires a
+paid Apple Developer account, so default builds are **unsigned** — acceptable for
+local/internal use (FR-075), with the Gatekeeper bypass above.
+
+To produce a signed + notarized release, set the `APPLE_*` credentials and run
+`scripts/build-macos.sh`; the full process (local and CI) is documented in
+**[`docs/BUILD.md`](./docs/BUILD.md)**. A tag-triggered GitHub Actions release
+workflow (`.github/workflows/release.yml`) signs/notarizes automatically when the
+repository secrets are configured.
 
 > **Heads-up — Accessibility permission resets on each rebuild.** Unsigned (ad-hoc)
 > builds get a *new* code identity every time they're built, and macOS ties the
@@ -140,8 +150,8 @@ Producing a signed, notarized release is tracked as **P1-008**.
 > even though it looks enabled — **remove it (select it, press “−”) and grant again**.
 > To make the grant persist across rebuilds during development, sign with a *stable*
 > identity (e.g. a self-signed code-signing cert created in Keychain Access, then set
-> `APPLE_SIGNING_IDENTITY="<cert name>"` before `pnpm tauri build`). A real Developer ID
-> signature (P1-008) fixes this for releases.
+> `APPLE_SIGNING_IDENTITY="<cert name>"` before `pnpm tauri build`; see
+> [`docs/BUILD.md`](./docs/BUILD.md)). A real Developer ID signature fixes this for releases.
 
 ## Using TLiquid
 
@@ -236,8 +246,13 @@ A starter GitHub Actions workflow lives in
 │  │  ├─ error.rs
 │  │  └─ providers/       # http core + OpenAI / Anthropic / Gemini / OpenRouter / Ollama
 │  ├─ capabilities/       # window permissions
+│  ├─ Entitlements.plist  # Hardened-Runtime entitlements for signed builds
 │  └─ tauri.conf.json
-└─ .github/workflows/ci.yml
+├─ scripts/build-macos.sh                      # official build/sign/notarize entry point
+├─ docs/BUILD.md                               # macOS build, signing & notarization guide
+└─ .github/workflows/
+   ├─ ci.yml                                   # lint/test/build on push + PR
+   └─ release.yml                              # tag-triggered signed release build
 ```
 
 ## Privacy

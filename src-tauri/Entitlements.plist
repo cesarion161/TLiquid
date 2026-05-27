@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for TLiquid (P1-008).
+
+  TLiquid is NOT App-Sandboxed (it is a direct-download menu-bar utility, not an
+  App Store app), so it needs no sandbox entitlement. Notarization, however,
+  requires the Hardened Runtime, and these entitlements relax only what the app
+  genuinely needs under it:
+
+  - JIT / unsigned-executable-memory: the WKWebView (Tauri's frontend) JITs
+    JavaScript. Without these the webview crashes under the Hardened Runtime.
+
+  Deliberately NOT granted: network-server, the App Sandbox, AppleEvents
+  automation (selected-text capture uses CGEvent key synthesis via `enigo`, not
+  AppleScript), and any device entitlements. Accessibility for the simulated ⌘C
+  is gated by macOS TCC at runtime, not by an entitlement.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+</dict>
+</plist>

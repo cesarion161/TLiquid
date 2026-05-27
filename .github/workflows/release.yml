@@ -1,0 +1,83 @@
+# macOS release build (P1-008). Triggered on version tags (v*).
+#
+# Signs + notarizes ONLY when the Apple secrets are configured; otherwise it
+# produces an unsigned bundle, so the workflow runs fine in a fork with no Apple
+# account. See docs/BUILD.md for the required repository secrets.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # Allow a manual dry run (always unsigned unless secrets resolve at runtime).
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write # create the GitHub Release + upload artifacts
+    # Hoist secrets to job-level env so the per-step `if:` guards can read them
+    # (a step's own step-level env is not available to that step's `if`).
+    env:
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_API_KEY_PATH_B64: ${{ secrets.APPLE_API_KEY_PATH_B64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      # Import the Developer ID certificate into a temporary keychain — only if
+      # the signing secret exists (skipped in forks / unsigned builds).
+      - name: Import Apple Developer certificate
+        if: ${{ env.APPLE_CERTIFICATE != '' }}
+        env:
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import certificate.p12 -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm certificate.p12
+
+      # Materialize the App Store Connect API key file from a base64 secret,
+      # again only when present.
+      - name: Write notarization API key
+        if: ${{ env.APPLE_API_KEY_PATH_B64 != '' }}
+        run: |
+          echo "$APPLE_API_KEY_PATH_B64" | base64 --decode > "$RUNNER_TEMP/apple_api_key.p8"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/apple_api_key.p8" >> "$GITHUB_ENV"
+
+      - name: Build (and sign/notarize if secrets present)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: 'TLiquid ${{ github.ref_name }}'
+          releaseDraft: true
+          prerelease: false
