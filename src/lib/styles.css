@@ -100,7 +100,7 @@ body {
   height: 100%;
 }
 
-/* Slim drag bar; the gear/back control sits at the right (no title text). */
+/* Slim drag bar: product name + version on the left, bell/gear (or back) right. */
 .titlebar {
   display: flex;
   align-items: center;
@@ -142,7 +142,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--tl-sp-2);
-  padding: 0 var(--tl-sp-3) var(--tl-sp-3);
+  /* Small top gap so the first field doesn't touch the titlebar. */
+  padding: var(--tl-sp-2) var(--tl-sp-3) var(--tl-sp-3);
   overflow-y: auto;
 }
 
