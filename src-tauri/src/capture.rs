@@ -107,9 +107,10 @@ pub fn capture_selection(_app: &AppHandle) -> Result<String> {
 fn interpret(captured: Option<String>) -> Result<String> {
     captured.ok_or_else(|| {
         AppError::Capture(
-            "No text was captured. Select some text in another app and try again. If this \
-             keeps happening, grant TLiquid Accessibility permission in System Settings → \
-             Privacy & Security → Accessibility."
+            "No text was captured. Make sure text is selected, and that TLiquid has \
+             Accessibility permission (System Settings → Privacy & Security → Accessibility). \
+             If TLiquid isn't listed there, run the installed TLiquid.app — capture can't work \
+             when the app is launched from a terminal or `tauri dev`."
                 .into(),
         )
     })

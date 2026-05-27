@@ -1,11 +1,22 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { isTauri } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { info } from "@tauri-apps/plugin-log";
   import { appVersion } from "./lib/tauri";
   import Settings from "./Settings.svelte";
   import Translate from "./Translate.svelte";
+
+  // Esc dismisses the panel (same as clicking outside / losing focus), from any
+  // view. Hiding triggers the window's blur handler, which remembers position.
+  function onKeydown(e: KeyboardEvent) {
+    if (e.key === "Escape" && isTauri()) {
+      getCurrentWindow()
+        .hide()
+        .catch(() => {});
+    }
+  }
 
   // The whole app is one window. Navigation between the translate view and the
   // Settings view is just a state swap here — no second window. See
@@ -36,6 +47,8 @@
   }
 
   onMount(async () => {
+    window.addEventListener("keydown", onKeydown);
+
     // The Tauri runtime is only present inside the app's own webview. Opening
     // this page in a regular browser (e.g. http://localhost:1420) has no IPC,
     // so guard rather than throwing a raw TypeError.
@@ -74,6 +87,8 @@
       }
     });
   });
+
+  onDestroy(() => window.removeEventListener("keydown", onKeydown));
 </script>
 
 <div class="panel">

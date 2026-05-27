@@ -259,14 +259,12 @@
   </div>
 
   <div class="row">
-    <div class="field grow">
-      <label class="label" for="target-lang">Target</label>
-      <select id="target-lang" class="select" bind:value={targetValue}>
-        {#each targets as t (t.value)}
-          <option value={t.value}>{t.label}</option>
-        {/each}
-      </select>
-    </div>
+    <label class="label" for="target-lang">Target</label>
+    <select id="target-lang" class="select grow" bind:value={targetValue}>
+      {#each targets as t (t.value)}
+        <option value={t.value}>{t.label}</option>
+      {/each}
+    </select>
     <button
       class="btn btn--primary"
       onclick={doTranslate}
