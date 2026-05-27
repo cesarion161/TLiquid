@@ -155,9 +155,9 @@ config fallback (`config`), shortcut conflict resolution + validity + entry-buil
 privacy guards (host allowlist, `reqwest` confinement, no-key-in-error, diagnostics
 no-secret-fields) still pass.
 
-## 2. IPC surface — fully wired (23 commands)
+## 2. IPC surface — fully wired (22 commands)
 
-All 23 `#[tauri::command]` functions are defined, registered in `invoke_handler!`
+All 22 `#[tauri::command]` functions are defined, registered in `invoke_handler!`
 (`lib.rs`), and exposed via a typed wrapper in `src/lib/tauri.ts` — cross-checked,
 **zero mismatches**. New since Phase 0: `translate_stream` (P1-009), `pause_shortcuts`
 + `validate_shortcut` (P1-002), `set_launch_at_login` + `is_launch_at_login` (P1-001),
@@ -235,7 +235,7 @@ All 23 `#[tauri::command]` functions are defined, registered in `invoke_handler!
 ## 8. Verdict
 
 Phase 1 is a **release candidate**: every automated gate is green (78 tests), the IPC
-surface is fully aligned (23 commands), and a complete installable `.app` + `.dmg` build.
+surface is fully aligned (22 commands), and a complete installable `.app` + `.dmg` build.
 Five of the six in-scope tasks (P1-001, P1-002, P1-004, P1-007, P1-009) are **done** and
 peer-reviewed; **P1-008 stays in-progress** pending an Apple Developer account. Sign-off is
 pending the §7 on-device checklist (and signing) — the interactive parts an automated,
