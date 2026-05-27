@@ -34,10 +34,11 @@ const PANEL_HEIGHT: f64 = 270.0;
 /// Gap kept between the panel and the screen edges / menu bar.
 const MARGIN: f64 = 8.0;
 
-/// Whether the panel has been given a position this session (restored from disk
-/// or anchored under the tray on first show). Once placed, summoning no longer
-/// repositions it, so a user-dragged location sticks.
-static PLACED: AtomicBool = AtomicBool::new(false);
+/// Set once the user has chosen a position — either by dragging the panel, or
+/// by us restoring a previously-dragged position from disk. While false, every
+/// summon re-anchors under the tray; once true, the chosen position sticks and
+/// is remembered across restarts.
+static USER_POSITIONED: AtomicBool = AtomicBool::new(false);
 
 /// Persisted panel position (physical pixels), stored next to `settings.json`.
 #[derive(Serialize, Deserialize)]
@@ -62,13 +63,13 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
         .visible(false) // shown on demand from the tray / hotkey
         .build()?;
 
-    // Restore the remembered position from a previous run, if it's still on a
-    // connected monitor (guards against a saved spot on a now-disconnected
-    // display). If restored, the panel is "placed" and won't be re-anchored.
+    // Restore a previously-dragged position, if it's still on a connected
+    // monitor (guards against a saved spot on a now-disconnected display). This
+    // runs while the window is hidden, so its move event isn't seen as a drag.
     if let Some((x, y)) = load_position(app) {
         if is_on_some_monitor(&window, x, y) {
             let _ = window.set_position(PhysicalPosition::new(x, y));
-            PLACED.store(true, Ordering::Relaxed);
+            USER_POSITIONED.store(true, Ordering::Relaxed);
         }
     }
 
@@ -79,14 +80,21 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
         // menu-bar process alive and reuses the warm webview (FR-005, PRD §13.2).
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
-            persist_position(&panel);
+            save_if_user_positioned(&panel);
             let _ = panel.hide();
         }
         // Auto-hide when focus is lost (click outside / switch apps), like
-        // Spotlight/Raycast. Remember where it was so it reopens there.
+        // Spotlight/Raycast. Remember the spot if the user dragged it there.
         WindowEvent::Focused(false) => {
-            persist_position(&panel);
+            save_if_user_positioned(&panel);
             let _ = panel.hide();
+        }
+        // We only reposition the panel while it's hidden (before showing), so a
+        // move while it's visible is the user dragging it — remember that.
+        WindowEvent::Moved(_) => {
+            if panel.is_visible().unwrap_or(false) {
+                USER_POSITIONED.store(true, Ordering::Relaxed);
+            }
         }
         _ => {}
     });
@@ -100,10 +108,11 @@ pub fn show_panel(app: &AppHandle) -> tauri::Result<()> {
     let Some(window) = app.get_webview_window(PANEL_LABEL) else {
         return Ok(());
     };
-    if !PLACED.load(Ordering::Relaxed) {
-        // Best-effort first placement — never block the show on a failed anchor.
+    // Until the user drags it somewhere, anchor under the tray on every summon
+    // (best-effort — never block the show on a failed anchor). Done while still
+    // hidden so the reposition isn't mistaken for a user drag.
+    if !USER_POSITIONED.load(Ordering::Relaxed) {
         let _ = position_under_tray(&window);
-        PLACED.store(true, Ordering::Relaxed);
     }
     window.show()?;
     window.set_focus()?;
@@ -125,8 +134,12 @@ fn load_position(app: &AppHandle) -> Option<(i32, i32)> {
     Some((pos.x, pos.y))
 }
 
-/// Save the panel's current position (best-effort) so it reopens there.
-fn persist_position(window: &WebviewWindow) {
+/// Persist the panel's current position (best-effort) so it reopens there — but
+/// only if the user actually chose it, so a default/anchor spot is never saved.
+fn save_if_user_positioned(window: &WebviewWindow) {
+    if !USER_POSITIONED.load(Ordering::Relaxed) {
+        return;
+    }
     let app = window.app_handle();
     let Ok(pos) = window.outer_position() else {
         return;
