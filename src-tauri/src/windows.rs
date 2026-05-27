@@ -213,16 +213,23 @@ pub fn apply_translucency(window: &WebviewWindow, enabled: bool) {
         use window_vibrancy::{
             apply_vibrancy, clear_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
         };
+        // Log rather than silently ignore: a failure (very rare on macOS 12+)
+        // leaves the panel transparent without a vibrancy layer behind it, so
+        // surfacing it in the diagnostics log tail aids debugging that case.
+        // (`apply_vibrancy`/`clear_vibrancy` have different `Ok` types, so the
+        // two branches are handled separately rather than unified.)
         if enabled {
             // `Sidebar` adapts to light/dark; `Active` keeps it lit (we hide on blur).
-            let _ = apply_vibrancy(
+            if let Err(e) = apply_vibrancy(
                 window,
                 NSVisualEffectMaterial::Sidebar,
                 Some(NSVisualEffectState::Active),
                 None,
-            );
-        } else {
-            let _ = clear_vibrancy(window);
+            ) {
+                log::warn!("could not apply window vibrancy: {e}");
+            }
+        } else if let Err(e) = clear_vibrancy(window) {
+            log::warn!("could not clear window vibrancy: {e}");
         }
     }
     #[cfg(not(target_os = "macos"))]
