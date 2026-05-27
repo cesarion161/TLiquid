@@ -6,8 +6,11 @@
 //! - `languages`    P0-006  primary/secondary routing engine
 //! - `providers`    P0-008  provider abstraction + adapters
 //! - `translation`  P0-010  translation orchestrator + prompt templates
+//! - `capture`      P0-013  macOS selected-text capture (simulated Cmd+C)
+//! - `shortcuts`    P0-007  global shortcut registration
 //! - `tray`/`windows` P0-002/P0-003  menu-bar shell and on-demand windows
 
+mod capture;
 mod commands;
 mod config;
 mod error;

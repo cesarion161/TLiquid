@@ -9,7 +9,8 @@
 //! selected-text capture + translate behavior for primary/secondary is wired in
 //! P0-013/P0-014/P0-015, which listen for that event.
 
-use crate::windows;
+use crate::{capture, windows};
+use serde::Serialize;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -81,12 +82,45 @@ fn register(app: &AppHandle, accelerator: &str, action: Action, errors: &mut Vec
     }
 }
 
+/// Payload for the `shortcut` event the panel listens for. For the translation
+/// shortcuts it carries the captured selection (or a capture error); the panel
+/// translates/prefills from it (P0-014/P0-015).
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShortcutPayload {
+    action: &'static str,
+    text: Option<String>,
+    error: Option<String>,
+}
+
 fn on_trigger(app: &AppHandle, action: Action) {
-    let _ = windows::show_panel(app, None);
     let payload = match action {
-        Action::OpenPanel => "open",
-        Action::Primary => "primary",
-        Action::Secondary => "secondary",
+        Action::OpenPanel => {
+            let _ = windows::show_panel(app, None);
+            ShortcutPayload {
+                action: "open",
+                text: None,
+                error: None,
+            }
+        }
+        Action::Primary | Action::Secondary => {
+            // Capture the selection BEFORE showing our panel, so the simulated
+            // Cmd+C targets the app the user is actually in, not TLiquid (P0-013).
+            let (text, error) = match capture::capture_selection(app) {
+                Ok(t) => (Some(t), None),
+                Err(e) => (None, Some(e.to_string())),
+            };
+            let _ = windows::show_panel(app, None);
+            ShortcutPayload {
+                action: if matches!(action, Action::Primary) {
+                    "primary"
+                } else {
+                    "secondary"
+                },
+                text,
+                error,
+            }
+        }
     };
     let _ = app.emit_to(windows::PANEL_LABEL, "shortcut", payload);
 }
