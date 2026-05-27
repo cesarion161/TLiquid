@@ -3,7 +3,6 @@
 
 use crate::config::{self, Settings};
 use crate::error::{AppError, Result};
-use crate::languages;
 use crate::providers::{self, ProviderId, ProviderMeta, TranslationRequest, TranslationResponse};
 use crate::{secrets, translation};
 use tauri::AppHandle;
@@ -84,16 +83,15 @@ pub async fn list_provider_models(provider: ProviderId) -> Result<Vec<String>> {
 pub async fn translate(app: AppHandle, request: TranslationRequest) -> Result<TranslationResponse> {
     let settings = config::load(&app);
 
-    let resolution = languages::resolve(
+    // The orchestrator resolves routing and builds the prompt (pure, tested in
+    // `translation`); here we add the I/O: Keychain lookup, the provider call,
+    // and response assembly.
+    let plan = translation::plan(
         &settings,
         request.routing_mode,
         request.explicit_target_language.clone(),
-    );
-    let target_language = resolution
-        .display_target()
-        .ok_or_else(|| AppError::Provider("No secondary language is configured.".into()))?;
-
-    let prompt = translation::build_prompt(&resolution, &request.source_text);
+        &request.source_text,
+    )?;
 
     let key = secrets::get_key(request.provider.as_str())?.ok_or_else(|| {
         AppError::Provider(format!(
@@ -104,7 +102,7 @@ pub async fn translate(app: AppHandle, request: TranslationRequest) -> Result<Tr
 
     let started = std::time::Instant::now();
     let translated_text = providers::adapter(request.provider)
-        .translate(&key, &request.model, &prompt)
+        .translate(&key, &request.model, &plan.prompt)
         .await?;
     let latency_ms = started.elapsed().as_millis() as u64;
 
@@ -118,7 +116,7 @@ pub async fn translate(app: AppHandle, request: TranslationRequest) -> Result<Tr
     Ok(TranslationResponse {
         translated_text,
         detected_source_language: None,
-        target_language,
+        target_language: plan.target_language,
         provider: request.provider,
         model: request.model,
         latency_ms,

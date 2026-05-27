@@ -1,15 +1,55 @@
 //! Translation orchestrator and prompt templates (P0-010, PRD §15.6).
 //!
-//! The prompt builders are pure and provider-neutral so adapters can reuse them.
-//! They produce a [`Prompt`] (system instruction + user content); the source
-//! text goes in the user message rather than being interpolated into the
-//! instructions. No translation text is persisted anywhere (PRD FR-019).
+//! [`plan`] is the orchestrator's pure core: it turns a request (source text +
+//! routing mode + language settings) into a [`TranslationPlan`] — the resolved
+//! target language plus the provider-neutral [`Prompt`] to send. The async I/O
+//! (Keychain lookup, the provider HTTP call, response assembly) lives in
+//! `commands::translate`, which calls `plan` then hands the prompt to an adapter.
+//!
+//! The prompt builders embed the source text in the user message, not the
+//! instructions, and instruct the model to return only the translation while
+//! preserving formatting/code (FR-014/FR-015). No translation text is persisted
+//! anywhere, and the only network calls are direct BYOK provider requests —
+//! TLiquid has no server of its own (FR-019/FR-020).
 
-use crate::languages::Resolution;
-use crate::providers::{Language, Prompt};
+use crate::config::Settings;
+use crate::error::{AppError, Result};
+use crate::languages::{self, Resolution};
+use crate::providers::{Language, Prompt, RoutingMode};
 
-/// Build the system/user prompt for a resolved routing decision.
-pub fn build_prompt(resolution: &Resolution, text: &str) -> Prompt {
+/// The resolved, ready-to-send result of orchestrating a translation request.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TranslationPlan {
+    /// Best-effort target to label the result with (see [`Resolution::display_target`]).
+    pub target_language: Language,
+    /// The system+user prompt to send to the chosen provider.
+    pub prompt: Prompt,
+}
+
+/// Orchestrate a request into a [`TranslationPlan`]: resolve routing against the
+/// user's language settings and build the matching prompt. Pure (no I/O), so the
+/// routing→prompt behavior is unit-tested. Errors only when secondary mode is
+/// requested without a secondary language configured.
+pub fn plan(
+    settings: &Settings,
+    mode: RoutingMode,
+    explicit: Option<Language>,
+    source_text: &str,
+) -> Result<TranslationPlan> {
+    let resolution = languages::resolve(settings, mode, explicit);
+    let target_language = resolution
+        .display_target()
+        .ok_or_else(|| AppError::Provider("No secondary language is configured.".into()))?;
+    let prompt = build_prompt(&resolution, source_text);
+    Ok(TranslationPlan {
+        target_language,
+        prompt,
+    })
+}
+
+/// Build the system/user prompt for a resolved routing decision. Internal to
+/// the orchestrator — callers use [`plan`], which guarantees a real target.
+pub(crate) fn build_prompt(resolution: &Resolution, text: &str) -> Prompt {
     match resolution {
         Resolution::Fixed(target) => build_explicit_prompt(target, text),
         Resolution::PrimaryRouted {
@@ -24,7 +64,7 @@ pub fn build_prompt(resolution: &Resolution, text: &str) -> Prompt {
     }
 }
 
-pub fn build_primary_prompt(
+pub(crate) fn build_primary_prompt(
     primary: &Language,
     secondary: Option<&Language>,
     fallback: &Language,
@@ -52,7 +92,7 @@ pub fn build_primary_prompt(
     }
 }
 
-pub fn build_explicit_prompt(target: &Language, text: &str) -> Prompt {
+pub(crate) fn build_explicit_prompt(target: &Language, text: &str) -> Prompt {
     let system = format!(
         "You are a translation engine.\n\n\
          Detect the source language automatically.\n\
@@ -105,5 +145,62 @@ mod tests {
             "Hello",
         );
         assert!(prompt.system.contains("Secondary language: Spanish"));
+    }
+
+    // ── orchestrator (plan) ────────────────────────────────────────────────
+
+    #[test]
+    fn plan_explicit_mode_targets_the_explicit_language() {
+        let settings = Settings::default();
+        let plan = plan(
+            &settings,
+            RoutingMode::Explicit,
+            Some(lang("de", "German")),
+            "Hello",
+        )
+        .unwrap();
+        assert_eq!(plan.target_language, lang("de", "German"));
+        assert!(plan
+            .prompt
+            .system
+            .contains("Translate the text into German."));
+        assert_eq!(plan.prompt.user, "Hello");
+    }
+
+    #[test]
+    fn plan_primary_mode_without_secondary_targets_primary_and_routes() {
+        let settings = Settings::default(); // primary = English, no secondary
+        let plan = plan(&settings, RoutingMode::Primary, None, "Hola").unwrap();
+        assert_eq!(plan.target_language.code, "en");
+        // Primary-mode prompt encodes the routing rules rather than one target.
+        assert!(plan.prompt.system.contains("Detect the source language"));
+        assert!(plan.prompt.system.contains("Secondary language: none"));
+        assert_eq!(plan.prompt.user, "Hola");
+    }
+
+    #[test]
+    fn plan_primary_mode_names_secondary_when_configured() {
+        let mut settings = Settings::default();
+        settings.languages.secondary = Some(lang("es", "Spanish"));
+        let plan = plan(&settings, RoutingMode::Primary, None, "Hello").unwrap();
+        assert!(plan.prompt.system.contains("Secondary language: Spanish"));
+    }
+
+    #[test]
+    fn plan_secondary_mode_requires_a_secondary_language() {
+        let settings = Settings::default(); // no secondary
+        assert!(plan(&settings, RoutingMode::Secondary, None, "Hi").is_err());
+    }
+
+    #[test]
+    fn plan_secondary_mode_targets_the_secondary_language() {
+        let mut settings = Settings::default();
+        settings.languages.secondary = Some(lang("fr", "French"));
+        let plan = plan(&settings, RoutingMode::Secondary, None, "Hello").unwrap();
+        assert_eq!(plan.target_language, lang("fr", "French"));
+        assert!(plan
+            .prompt
+            .system
+            .contains("Translate the text into French."));
     }
 }
