@@ -52,7 +52,22 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(
+            // Persist logs to a file in the app log dir (P1-007) so the
+            // diagnostics bundle can include recent log lines + error counts.
+            // The file name is fixed (`tliquid.log`) so `diagnostics` can find it.
+            tauri_plugin_log::Builder::new()
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Stdout,
+                ))
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("tliquid".into()),
+                    },
+                ))
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .setup(|app| {
             // macOS: live in the menu bar and stay out of the Dock while idle
             // (FR-007). Accessory mode also lets the panel float over fullscreen
@@ -114,6 +129,7 @@ pub fn run() {
             commands::validate_shortcut,
             commands::open_accessibility_settings,
             commands::diagnostics,
+            commands::export_diagnostics,
             commands::set_launch_at_login,
             commands::is_launch_at_login,
         ])

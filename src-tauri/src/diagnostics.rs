@@ -1,15 +1,23 @@
-//! Local diagnostics export (P0-016, FR-064/FR-065, PRD §10.6.6).
+//! Local diagnostics export (P0-016 + P1-007, FR-064/FR-065/FR-067, PRD §10.6.6).
 //!
-//! Produces a plain-text summary the user can copy into a bug report. It is
-//! **never uploaded** — there is no TLiquid server. By construction it contains
-//! only non-sensitive metadata: app/OS info and settings *shape*. It must never
-//! include API keys, translation text, clipboard contents, prompts, or provider
-//! responses (the struct has no field for any of those).
+//! Produces a plain-text bundle the user can copy or save for a bug report. It
+//! is **never uploaded** — there is no TLiquid server. The metadata section
+//! contains only non-sensitive settings *shape* (the [`Diagnostics`] struct has
+//! no field for any key/text). The bundle also includes a tail of the app log
+//! and a recent-error summary (P1-007); this is safe because TLiquid's logging
+//! discipline (P0-017 audit) never writes API keys, translation text, clipboard
+//! contents, prompts, or provider responses to the log — so the log carries only
+//! categories/levels, never the forbidden content (FR-067).
 
 use crate::config;
 use crate::providers;
 use crate::secrets;
-use tauri::AppHandle;
+use crate::startup;
+use std::path::PathBuf;
+use tauri::{AppHandle, Manager};
+
+/// How many trailing log lines the bundle includes.
+const LOG_TAIL_LINES: usize = 80;
 
 /// Non-sensitive snapshot for a bug report. Note the absence of any text/key field.
 #[derive(Debug, Clone, PartialEq)]
@@ -23,6 +31,7 @@ pub struct Diagnostics {
     pub secondary_language: Option<String>,
     pub additional_languages: usize,
     pub shortcuts_enabled: bool,
+    pub launch_at_login: bool,
     /// Provider ids that have a key configured — presence only, never the key.
     pub configured_providers: Vec<String>,
 }
@@ -51,8 +60,50 @@ pub fn collect(app: &AppHandle) -> Diagnostics {
             .map(|l| l.code.clone()),
         additional_languages: settings.languages.additional.len(),
         shortcuts_enabled: settings.shortcuts.enabled,
+        launch_at_login: startup::is_enabled(app),
         configured_providers,
     }
+}
+
+/// Absolute path to the persisted log file (P1-007), matching the `LogDir`
+/// target configured in `lib.rs` (`tliquid.log` in the app log dir).
+pub fn log_file_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_log_dir()
+        .ok()
+        .map(|dir| dir.join("tliquid.log"))
+}
+
+/// The last [`LOG_TAIL_LINES`] lines of the log file (P1-007), or an empty vec
+/// if there is no log yet. Reading the whole file is fine — the log plugin
+/// rotates it, so it stays bounded.
+fn recent_log_lines(app: &AppHandle) -> Vec<String> {
+    let Some(path) = log_file_path(app) else {
+        return Vec::new();
+    };
+    let Ok(contents) = std::fs::read_to_string(&path) else {
+        return Vec::new();
+    };
+    let lines: Vec<&str> = contents.lines().collect();
+    let start = lines.len().saturating_sub(LOG_TAIL_LINES);
+    lines[start..].iter().map(|s| s.to_string()).collect()
+}
+
+/// Count error/warn lines in a log tail by their level token (P1-007 "recent
+/// error categories"). Pure, so it is unit-tested. The level appears as a
+/// bracketed/standalone token in the log plugin's format, e.g. `[ERROR]`.
+fn count_levels(lines: &[String]) -> (usize, usize) {
+    let mut errors = 0;
+    let mut warns = 0;
+    for line in lines {
+        let upper = line.to_uppercase();
+        if upper.contains("ERROR") {
+            errors += 1;
+        } else if upper.contains("WARN") {
+            warns += 1;
+        }
+    }
+    (errors, warns)
 }
 
 impl Diagnostics {
@@ -73,6 +124,7 @@ impl Diagnostics {
              secondary language: {secondary}\n\
              additional languages: {additional}\n\
              global shortcuts enabled: {shortcuts}\n\
+             launch at login: {launch}\n\
              providers configured: {configured}",
             version = self.version,
             os = self.os,
@@ -83,9 +135,33 @@ impl Diagnostics {
             secondary = self.secondary_language.as_deref().unwrap_or("none"),
             additional = self.additional_languages,
             shortcuts = self.shortcuts_enabled,
+            launch = self.launch_at_login,
             configured = configured,
         )
     }
+}
+
+/// The full diagnostics bundle (P1-007): the non-secret metadata report, a
+/// recent-error summary, and the tail of the app log — for a bug report. Local
+/// only; never uploaded (FR-064). Contains no keys/text by construction +
+/// logging discipline (see the module docs).
+pub fn bundle(app: &AppHandle) -> String {
+    let report = collect(app).to_report();
+    let log = recent_log_lines(app);
+    let (errors, warns) = count_levels(&log);
+
+    let mut out = report;
+    out.push_str(&format!(
+        "\n\nrecent log: {} lines ({errors} error, {warns} warn)",
+        log.len()
+    ));
+    out.push_str("\n\n--- recent log (tail) ---\n");
+    if log.is_empty() {
+        out.push_str("(no log file yet)");
+    } else {
+        out.push_str(&log.join("\n"));
+    }
+    out
 }
 
 #[cfg(test)]
@@ -103,6 +179,7 @@ mod tests {
             secondary_language: Some("es".into()),
             additional_languages: 2,
             shortcuts_enabled: true,
+            launch_at_login: false,
             configured_providers: vec!["openai".into(), "anthropic".into()],
         }
     }
@@ -147,10 +224,23 @@ mod tests {
                         | "secondary language"
                         | "additional languages"
                         | "global shortcuts enabled"
+                        | "launch at login"
                         | "providers configured"
                 ),
                 "unexpected diagnostics field: {label}"
             );
         }
+    }
+
+    #[test]
+    fn count_levels_tallies_errors_and_warns() {
+        let lines = vec![
+            "[2026-01-01][tliquid][INFO] panel ready".to_string(),
+            "[2026-01-01][tliquid][WARN] shortcut not registered".to_string(),
+            "[2026-01-01][tliquid][ERROR] provider error: rate limited".to_string(),
+            "[2026-01-01][tliquid][ERROR] capture error".to_string(),
+        ];
+        assert_eq!(count_levels(&lines), (2, 1));
+        assert_eq!(count_levels(&[]), (0, 0));
     }
 }

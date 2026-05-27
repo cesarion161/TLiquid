@@ -313,8 +313,10 @@ translation and is disclosed here intentionally.
   `xattr -dr com.apple.quarantine /Applications/TLiquid.app` (unsigned build).
 - **"Not running inside the TLiquid app":** you opened the dev URL in a browser —
   use the window `pnpm tauri dev` opens instead.
-- **Bug reports:** Settings → Privacy → **Copy diagnostics** copies a local,
-  non-sensitive summary (no keys or text) to paste into an issue.
+- **Bug reports:** Settings → Privacy → **Copy diagnostics** (clipboard) or
+  **Save to file…** exports a local, non-sensitive bundle — app/OS info, your
+  settings shape, a recent-error summary, and a tail of the local log (no keys,
+  text, or provider responses). Never uploaded.
 
 ## Status
 

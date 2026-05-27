@@ -111,8 +111,12 @@ export const pauseShortcuts = (): Promise<void> => invoke("pause_shortcuts");
 export const openAccessibilitySettings = (): Promise<void> =>
   invoke("open_accessibility_settings");
 
-/** Local, copy-pasteable diagnostics report (no upload; FR-064/FR-065). */
+/** Local, copy-pasteable diagnostics bundle (metadata + log tail; no upload; FR-064/FR-065). */
 export const diagnostics = (): Promise<string> => invoke("diagnostics");
+
+/** Write the diagnostics bundle to a file and return its path (P1-007; no upload). */
+export const exportDiagnostics = (): Promise<string> =>
+  invoke("export_diagnostics");
 
 /** Enable/disable launching TLiquid at login (P1-001, FR-053/055). */
 export const setLaunchAtLogin = (enabled: boolean): Promise<void> =>

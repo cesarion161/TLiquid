@@ -87,11 +87,27 @@ pub fn open_accessibility_settings() -> Result<()> {
     }
 }
 
-/// A local, copy-pasteable diagnostics report for bug reports (FR-065). Contains
-/// only non-sensitive metadata and is never uploaded (FR-064).
+/// A local, copy-pasteable diagnostics bundle for bug reports (FR-065): the
+/// non-sensitive metadata, a recent-error summary, and a log tail (P1-007).
+/// Never uploaded (FR-064); contains no keys/text (FR-067).
 #[tauri::command]
 pub fn diagnostics(app: AppHandle) -> String {
-    diagnostics::collect(&app).to_report()
+    diagnostics::bundle(&app)
+}
+
+/// Write the diagnostics bundle to a file the user can attach to a bug report
+/// (P1-007), returning its absolute path. Local only — no upload (FR-064).
+#[tauri::command]
+pub fn export_diagnostics(app: AppHandle) -> Result<String> {
+    let bundle = diagnostics::bundle(&app);
+    // Co-locate with the logs, in the app log dir.
+    let dir = diagnostics::log_file_path(&app)
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .ok_or_else(|| AppError::Config("could not resolve the log directory".into()))?;
+    std::fs::create_dir_all(&dir).map_err(|e| AppError::Config(e.to_string()))?;
+    let path = dir.join("tliquid-diagnostics.txt");
+    std::fs::write(&path, bundle).map_err(|e| AppError::Config(e.to_string()))?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 /// Enable/disable launching TLiquid at login (P1-001, FR-053/054/055). This is
