@@ -320,11 +320,15 @@ translation and is disclosed here intentionally.
 
 ## Status
 
-Phase 0 (macOS MVP) is feature-complete: menu-bar shell, settings (languages,
-shortcuts, providers/models, privacy/about), secure key storage, manual and
-selected-text translation against real BYOK providers, copy/Enter behavior, and
-an installable `.app`. Remaining work is end-to-end QA (**P0-021**) and signing
-(**P1-008**). Epic-by-epic status is tracked in [`tliquid_todo.md`](./tliquid_todo.md).
+Phase 0 (macOS MVP) is complete. **Phase 1** adds: streaming translation output
+(P1-009), **Ollama / local models** (P1-004), **configurable shortcuts** with
+per-language hotkeys + conflict detection (P1-002), **launch-at-login** with a
+first-run consent (P1-001), and a richer **diagnostics bundle** with export
+(P1-007). Packaging supports signing + notarization (P1-008), but official signed
+builds need a paid Apple Developer account, so default builds remain unsigned. The
+automated gate is green (78 tests) and the full `.app` + `.dmg` build; remaining
+sign-off is the on-device checklist in [`QA.md`](./QA.md) and signing. Epic-by-epic
+status is tracked in [`tliquid_todo.md`](./tliquid_todo.md).
 
 ## License
 
