@@ -97,7 +97,9 @@ pub fn run() {
             commands::translate,
             commands::translate_stream,
             commands::apply_shortcuts,
+            commands::pause_shortcuts,
             commands::shortcut_errors,
+            commands::validate_shortcut,
             commands::open_accessibility_settings,
             commands::diagnostics,
         ])

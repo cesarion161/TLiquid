@@ -41,10 +41,26 @@ pub fn apply_shortcuts(app: AppHandle) -> Vec<String> {
     shortcuts::apply(&app)
 }
 
+/// Temporarily unregister all global shortcuts (P1-002). The Settings UI calls
+/// this while recording a new shortcut, so the combo reaches the webview instead
+/// of being consumed by an already-registered global hotkey; it re-applies after.
+#[tauri::command]
+pub fn pause_shortcuts(app: AppHandle) {
+    shortcuts::pause(&app);
+}
+
 /// Registration errors from the most recent shortcut (re)apply, for Settings.
 #[tauri::command]
 pub fn shortcut_errors(app: AppHandle) -> Vec<String> {
     shortcuts::stored_errors(&app)
+}
+
+/// Whether `accelerator` is a valid global-shortcut string (P1-002). The
+/// Settings UI calls this before saving a recorded shortcut so invalid combos
+/// are rejected rather than persisted.
+#[tauri::command]
+pub fn validate_shortcut(accelerator: String) -> bool {
+    shortcuts::is_valid(&accelerator)
 }
 
 /// Open macOS System Settings at Privacy & Security → Accessibility, so the user

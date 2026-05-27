@@ -53,6 +53,10 @@ pub struct AdditionalLanguage {
     pub code: String,
     pub name: String,
     pub enabled: bool,
+    /// Optional global shortcut that translates the selection into this language
+    /// (P1-002, FR-032). Defaulted so older settings files still load (FR-049).
+    #[serde(default)]
+    pub shortcut: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

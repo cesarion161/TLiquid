@@ -52,7 +52,9 @@ export interface Settings {
   languages: {
     primary: Language;
     secondary: Language | null;
-    additional: Array<Language & { enabled: boolean }>;
+    additional: Array<
+      Language & { enabled: boolean; shortcut?: string | null }
+    >;
   };
   shortcuts: {
     translatePrimary: string;
@@ -97,6 +99,13 @@ export const applyShortcuts = (): Promise<string[]> => invoke("apply_shortcuts")
 
 /** Registration errors from the most recent shortcut apply. */
 export const shortcutErrors = (): Promise<string[]> => invoke("shortcut_errors");
+
+/** Whether an accelerator string is a valid global shortcut (P1-002). */
+export const validateShortcut = (accelerator: string): Promise<boolean> =>
+  invoke("validate_shortcut", { accelerator });
+
+/** Temporarily unregister all global shortcuts while recording a new one (P1-002). */
+export const pauseShortcuts = (): Promise<void> => invoke("pause_shortcuts");
 
 /** Open macOS System Settings → Privacy & Security → Accessibility (FR-018). */
 export const openAccessibilitySettings = (): Promise<void> =>

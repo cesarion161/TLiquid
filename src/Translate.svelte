@@ -26,9 +26,11 @@
   // lets us process each request once; `text` is the captured selection (or
   // `error` if capture failed). `action` selects the routing mode.
   type ShortcutRequest = {
-    action: "primary" | "secondary";
+    action: "primary" | "secondary" | "explicit";
     text: string | null;
     error: string | null;
+    // For an additional-language shortcut (P1-002): the explicit target language.
+    target: Language | null;
     id: number;
   };
   let {
@@ -238,6 +240,19 @@
         return;
       }
       if (s?.languages.secondary) targetValue = s.languages.secondary.code;
+    }
+
+    // An additional-language shortcut forces its explicit target, regardless of
+    // the sticky Target selection (P1-002). Reflect it in the dropdown too.
+    if (req.action === "explicit" && req.target) {
+      targetValue = req.target.code;
+      sourceText = req.text;
+      output = null;
+      copied = false;
+      error = null;
+      permissionHelp = false;
+      runTranslation(req.text, "explicit", req.target);
+      return;
     }
 
     sourceText = req.text;

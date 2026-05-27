@@ -191,7 +191,10 @@ language is always used; **Auto** applies the primary/secondary rules
 The panel drops down under the menu-bar icon, **remembers where you drag it**, and
 **auto-hides when it loses focus** (click outside, switch apps, or press **Esc**) —
 re-open it from the tray icon (or the hotkey, with text selected). Shortcuts can be
-toggled off in **Settings → Shortcuts** (custom remapping is a later phase).
+toggled off in **Settings → Shortcuts**, where you can also **record custom
+shortcuts** for translate-selection, translate-to-secondary, and any additional
+language (click the shortcut, press your combo; conflicts and invalid combos are
+flagged; **Reset to defaults** restores ⌘⇧T / ⌘⇧⌥T).
 
 ### How your API keys are stored
 

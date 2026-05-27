@@ -4,7 +4,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { info } from "@tauri-apps/plugin-log";
-  import { appVersion } from "./lib/tauri";
+  import { appVersion, type Language } from "./lib/tauri";
   import Settings from "./Settings.svelte";
   import Translate from "./Translate.svelte";
 
@@ -25,11 +25,13 @@
 
   // A selected-text hotkey delivers the captured text (or a capture error) here;
   // we route to the translate view and hand it to <Translate>. A monotonic `id`
-  // lets the child process each request once (P0-014/P0-015).
+  // lets the child process each request once (P0-014/P0-015). An additional-
+  // language shortcut (P1-002) carries its explicit `target` language.
   type ShortcutRequest = {
-    action: "primary" | "secondary";
+    action: "primary" | "secondary" | "explicit";
     text: string | null;
     error: string | null;
+    target: Language | null;
     id: number;
   };
 
@@ -75,13 +77,20 @@
     // selection (or a capture error). It only fires when there's something to act
     // on — a no-selection press is a silent no-op and never reaches here.
     await listen<{
-      action: "primary" | "secondary";
+      action: "primary" | "secondary" | "explicit";
       text: string | null;
       error: string | null;
+      target: Language | null;
     }>("shortcut", (event) => {
       const p = event.payload;
       view = "translate";
-      shortcutRequest = { action: p.action, text: p.text, error: p.error, id: ++seq };
+      shortcutRequest = {
+        action: p.action,
+        text: p.text,
+        error: p.error,
+        target: p.target ?? null,
+        id: ++seq,
+      };
     });
   });
 
