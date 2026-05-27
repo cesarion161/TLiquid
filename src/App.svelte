@@ -114,9 +114,12 @@
 </script>
 
 <div class="panel">
-  <!-- Frameless window: this slim bar is the drag handle and houses the bell +
-       gear (on translate) or a back arrow (on settings/notifications). -->
+  <!-- Frameless window: this slim bar is the drag handle. Left: product name +
+       version. Right: bell + gear (on translate) or a back arrow (elsewhere). -->
   <header class="titlebar" data-tauri-drag-region>
+    <span class="titlebar-title">
+      TLiquid <span class="titlebar-version">v{version}</span>
+    </span>
     {#if view === "translate"}
       <button
         class="icon-btn bell"
@@ -129,8 +132,8 @@
         onclick={() => goTo("notifications")}
       >
         <svg
-          width="15"
-          height="15"
+          width="16"
+          height="16"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -152,7 +155,22 @@
         aria-label="Open settings"
         onclick={() => goTo("settings")}
       >
-        ⚙
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="3"></circle>
+          <path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+          ></path>
+        </svg>
       </button>
     {:else}
       <button
@@ -161,7 +179,20 @@
         aria-label="Back to translate"
         onclick={() => goTo("translate")}
       >
-        ←
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
       </button>
     {/if}
   </header>
@@ -191,6 +222,21 @@
 </div>
 
 <style>
+  /* Product name + version on the left of the titlebar; pushes the action
+     buttons to the right (margin-right: auto). Part of the drag region. */
+  .titlebar-title {
+    margin-right: auto;
+    padding-left: var(--tl-sp-2);
+    font-size: var(--tl-fs-sm);
+    font-weight: 600;
+    color: var(--tl-text);
+    white-space: nowrap;
+  }
+  .titlebar-version {
+    font-weight: 400;
+    color: var(--tl-text-muted);
+  }
+
   /* Unread badge on the notification bell. */
   .bell {
     position: relative;
