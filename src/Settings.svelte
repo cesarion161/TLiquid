@@ -16,6 +16,7 @@
   import StartupSettings from "./StartupSettings.svelte";
   import ProviderSettings from "./ProviderSettings.svelte";
   import PrivacySettings from "./PrivacySettings.svelte";
+  import AppearanceSettings from "./AppearanceSettings.svelte";
   import AboutSettings from "./AboutSettings.svelte";
 
   // Settings view of the panel (not a separate window). The version is passed
@@ -36,11 +37,14 @@
     update = null,
     // Bubbles an update found by the Updates section up to App (lights the bell).
     onUpdateAvailable = () => {},
+    // Bubbles a translucency toggle up to App (flips the body `.translucent` class).
+    onTranslucencyChange = () => {},
   }: {
     version?: string;
     hidden?: boolean;
     update?: UpdateStatus | null;
     onUpdateAvailable?: (status: UpdateStatus | null) => void;
+    onTranslucencyChange?: (enabled: boolean) => void;
   } = $props();
 
   let configPath = $state<string | null>(null);
@@ -108,6 +112,7 @@
     <ShortcutSettings {settings} onChange={persist} {hidden} />
     <ProviderSettings {settings} onChange={persist} />
     <StartupSettings {settings} />
+    <AppearanceSettings {settings} onChange={onTranslucencyChange} />
   {/if}
 
   <div class="section">

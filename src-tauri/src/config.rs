@@ -45,6 +45,11 @@ pub struct Ui {
     pub theme: String,
     pub accent_color: String,
     pub open_result_from: String,
+    /// macOS translucency/vibrancy behind the panel ("Liquid Glass", P2-012).
+    /// Defaulted so older settings files load; respects the system Reduce-
+    /// Transparency setting automatically (AppKit renders the material opaque).
+    #[serde(default = "default_true")]
+    pub translucent: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -170,6 +175,7 @@ impl Default for Settings {
                 theme: "system".into(),
                 accent_color: "default".into(),
                 open_result_from: "menu_bar".into(),
+                translucent: true,
             },
             languages: Languages {
                 // English is the mandatory default primary language (FR-022).

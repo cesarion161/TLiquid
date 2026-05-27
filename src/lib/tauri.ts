@@ -48,7 +48,13 @@ export interface TranslationResponse {
 export interface Settings {
   version: number;
   startup: { enabled: boolean; prompted: boolean };
-  ui: { theme: string; accentColor: string; openResultFrom: string };
+  ui: {
+    theme: string;
+    accentColor: string;
+    openResultFrom: string;
+    /** macOS translucency/vibrancy behind the panel (P2-012). */
+    translucent: boolean;
+  };
   languages: {
     primary: Language;
     secondary: Language | null;
@@ -127,6 +133,10 @@ export const setLaunchAtLogin = (enabled: boolean): Promise<void> =>
 /** The real OS launch-at-login state (P1-001, FR-053). */
 export const isLaunchAtLogin = (): Promise<boolean> =>
   invoke("is_launch_at_login");
+
+/** Persist + apply the macOS panel translucency toggle (P2-012). */
+export const setTranslucency = (enabled: boolean): Promise<void> =>
+  invoke("set_translucency", { enabled });
 
 export const setProviderKey = (provider: ProviderId, key: string): Promise<void> =>
   invoke("set_provider_key", { provider, key });

@@ -14,10 +14,14 @@
   import Translate from "./Translate.svelte";
   import Notifications from "./Notifications.svelte";
 
-  // Esc dismisses the panel (same as clicking outside / losing focus), from any
-  // view. Hiding triggers the window's blur handler, which remembers position.
+  // Esc backs out of an open overlay (Settings/Notifications) first; from the
+  // translate view it dismisses the whole panel (like clicking outside / blur,
+  // whose handler also remembers the window position).
   function onKeydown(e: KeyboardEvent) {
-    if (e.key === "Escape" && isTauri()) {
+    if (e.key !== "Escape" || !isTauri()) return;
+    if (view !== "translate") {
+      goTo("translate");
+    } else {
       getCurrentWindow()
         .hide()
         .catch(() => {});
@@ -62,6 +66,22 @@
     (startupPrompted ? 0 : 1) + (pendingUpdate?.available ? 1 : 0),
   );
 
+  // Settings/Notifications render as an overlay pane over the translate base
+  // (P2-012), rather than replacing it — so the panel doesn't look sparse when
+  // resized large.
+  const overlayOpen = $derived(view !== "translate");
+
+  // macOS panel translucency (P2-012). The window has a vibrancy layer applied
+  // in Rust; flipping this class makes the panel background transparent so it
+  // shows through. Initialized from settings on mount; toggled from Appearance.
+  let translucent = $state(true);
+  $effect(() => {
+    document.body.classList.toggle("translucent", translucent);
+  });
+  function setTranslucent(enabled: boolean) {
+    translucent = enabled;
+  }
+
   // Switch views; manual navigation drops any pending hotkey request so returning
   // to translate doesn't replay an old capture.
   function goTo(next: View) {
@@ -90,9 +110,11 @@
     }
 
     // Has the launch-at-login consent been answered? Drives the bell badge.
+    // Also pick up the saved translucency preference for the body class.
     try {
       const settings = await getSettings();
       startupPrompted = settings.startup.prompted;
+      translucent = settings.ui.translucent;
     } catch {
       /* leave assumed-answered (no badge) if settings can't load */
     }
@@ -221,28 +243,44 @@
       <p class="error">{error}</p>
     </section>
   {:else}
-    <!-- Both views stay mounted (hidden, not unmounted) so the translate view
-         keeps its typed text and result while you visit Settings. Translate
-         re-reads settings whenever it becomes active again, picking up changes.
+    <!-- Translate is the always-present base layer (keeps its typed text +
+         result). Settings/Notifications slide in as a fixed-width overlay pane
+         over part of it (P2-012), so the panel doesn't look sparse when resized
+         large. All three stay mounted; the overlay's children toggle by `hidden`.
          `request` carries a selected-text hotkey capture to translate. -->
-    <Translate
-      hidden={view !== "translate"}
-      active={view === "translate"}
-      request={shortcutRequest}
-      onOpenSettings={() => goTo("settings")}
-    />
-    <Settings
-      {version}
-      hidden={view !== "settings"}
-      update={pendingUpdate}
-      onUpdateAvailable={(s) => (pendingUpdate = s)}
-    />
-    <Notifications
-      hidden={view !== "notifications"}
-      {startupPrompted}
-      update={pendingUpdate}
-      onAnswered={() => (startupPrompted = true)}
-    />
+    <div class="stage">
+      <Translate
+        active={view === "translate"}
+        request={shortcutRequest}
+        onOpenSettings={() => goTo("settings")}
+      />
+
+      {#if overlayOpen}
+        <!-- Dim the uncovered base; click anywhere on it returns to translate. -->
+        <button
+          type="button"
+          class="scrim"
+          aria-label="Close"
+          onclick={() => goTo("translate")}
+        ></button>
+      {/if}
+
+      <div class="overlay" class:open={overlayOpen} aria-hidden={!overlayOpen}>
+        <Settings
+          {version}
+          hidden={view !== "settings"}
+          update={pendingUpdate}
+          onUpdateAvailable={(s) => (pendingUpdate = s)}
+          onTranslucencyChange={setTranslucent}
+        />
+        <Notifications
+          hidden={view !== "notifications"}
+          {startupPrompted}
+          update={pendingUpdate}
+          onAnswered={() => (startupPrompted = true)}
+        />
+      </div>
+    </div>
   {/if}
 </div>
 

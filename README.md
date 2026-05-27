@@ -208,6 +208,14 @@ shortcuts** for translate-selection, translate-to-secondary, and any additional
 language (click the shortcut, press your combo; conflicts and invalid combos are
 flagged; **Reset to defaults** restores ⌘⇧T / ⌘⇧⌥T).
 
+The panel is **resizable** — drag any edge to make it larger (it won't go below
+the compact default), and the size is remembered along with the position; the
+input and translation areas grow with it. By default it uses a **translucent
+“glass” background** on macOS; turn this off in **Settings → Appearance** for a
+solid panel (it also becomes solid automatically when macOS *Reduce transparency*
+is enabled). Settings and Notifications open as a **pane sliding over** the
+translate view — press **Esc** or click outside the pane to close it.
+
 ### How your API keys are stored
 
 Keys are stored in the **macOS Keychain** (service `com.tliquid.app`, one entry

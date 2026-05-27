@@ -21,7 +21,7 @@ tauri-build = { version = "2", features = [] }
 tempfile = "3"
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-global-shortcut = "2"
@@ -65,6 +65,9 @@ tauri-plugin-updater = "2"
 # the dependency platform-gated avoids pulling input libs on other targets.
 [target.'cfg(target_os = "macos")'.dependencies]
 enigo = "0.6"
+# macOS translucency/vibrancy behind the panel (P2-012). Applies an
+# NSVisualEffectView; already in the dependency tree, so this adds no weight.
+window-vibrancy = "0.6"
 
 [profile.release]
 # Optimize for a small always-running utility (PRD §13.1 footprint targets).

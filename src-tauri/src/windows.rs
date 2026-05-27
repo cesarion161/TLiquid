@@ -21,8 +21,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{
-    AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    WindowEvent,
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
 };
 
 /// Label of the one and only panel window. Also the capability target.
@@ -40,11 +40,23 @@ const MARGIN: f64 = 8.0;
 /// is remembered across restarts.
 static USER_POSITIONED: AtomicBool = AtomicBool::new(false);
 
-/// Persisted panel position (physical pixels), stored next to `settings.json`.
-#[derive(Serialize, Deserialize)]
-struct SavedPosition {
-    x: i32,
-    y: i32,
+/// Set once the user has resized the panel; like [`USER_POSITIONED`] but for size
+/// (P2-012). While false, the default compact size is used and not persisted.
+static USER_SIZED: AtomicBool = AtomicBool::new(false);
+
+/// Persisted panel geometry (physical pixels), stored next to `settings.json`.
+/// All fields optional so position and size persist independently and a file
+/// written before sizing existed (only `x`/`y`) still loads (P2-012 back-compat).
+#[derive(Default, Serialize, Deserialize)]
+struct SavedWindow {
+    #[serde(default)]
+    x: Option<i32>,
+    #[serde(default)]
+    y: Option<i32>,
+    #[serde(default)]
+    width: Option<u32>,
+    #[serde(default)]
+    height: Option<u32>,
 }
 
 /// Create the panel up front, hidden. Called once during setup.
@@ -55,23 +67,39 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
     let window = WebviewWindowBuilder::new(app, PANEL_LABEL, WebviewUrl::App("index.html".into()))
         .title("TLiquid")
         .inner_size(PANEL_WIDTH, PANEL_HEIGHT)
-        .resizable(false)
+        // Resizable, but never smaller than the compact default (P2-012): the
+        // current size is the minimum; the inner layout grows proportionally.
+        .min_inner_size(PANEL_WIDTH, PANEL_HEIGHT)
+        .resizable(true)
         .decorations(false) // frameless panel; the titlebar is drawn in the UI
+        // Transparent so the optional macOS vibrancy shows through (P2-012). When
+        // translucency is off, the webview's opaque CSS background fills it, so it
+        // looks like a normal solid panel. Needs `app.macOSPrivateApi` in config.
+        .transparent(true)
         .always_on_top(true) // float above other windows…
         .visible_on_all_workspaces(true) // …including fullscreen Spaces
         .skip_taskbar(true)
         .visible(false) // shown on demand from the tray / hotkey
         .build()?;
 
-    // Restore a previously-dragged position, if it's still on a connected
-    // monitor (guards against a saved spot on a now-disconnected display). This
-    // runs while the window is hidden, so its move event isn't seen as a drag.
-    if let Some((x, y)) = load_position(app) {
+    // Restore a previously-dragged position and/or resized size, each only if the
+    // user chose it (guarding a position against a now-disconnected display, and a
+    // size against the minimum). This runs while hidden, so the resulting move/
+    // resize events aren't seen as user gestures.
+    let saved = load_window(app);
+    if let (Some(x), Some(y)) = (saved.x, saved.y) {
         if is_on_some_monitor(&window, x, y) {
             let _ = window.set_position(PhysicalPosition::new(x, y));
             USER_POSITIONED.store(true, Ordering::Relaxed);
         }
     }
+    if let (Some(w), Some(h)) = (saved.width, saved.height) {
+        let _ = window.set_size(PhysicalSize::new(w.max(1), h.max(1)));
+        USER_SIZED.store(true, Ordering::Relaxed);
+    }
+
+    // Apply the saved translucency preference (P2-012). No-op off macOS.
+    apply_translucency(&window, crate::config::load(app).ui.translucent);
 
     let panel = window.clone();
     window.on_window_event(move |event| match event {
@@ -80,20 +108,25 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
         // menu-bar process alive and reuses the warm webview (FR-005, PRD §13.2).
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
-            save_if_user_positioned(&panel);
+            save_geometry(&panel);
             let _ = panel.hide();
         }
         // Auto-hide when focus is lost (click outside / switch apps), like
-        // Spotlight/Raycast. Remember the spot if the user dragged it there.
+        // Spotlight/Raycast. Remember the spot/size if the user changed them.
         WindowEvent::Focused(false) => {
-            save_if_user_positioned(&panel);
+            save_geometry(&panel);
             let _ = panel.hide();
         }
-        // We only reposition the panel while it's hidden (before showing), so a
-        // move while it's visible is the user dragging it — remember that.
+        // We only reposition/resize the panel while it's hidden (before showing),
+        // so a move/resize while it's visible is the user doing it — remember that.
         WindowEvent::Moved(_) => {
             if panel.is_visible().unwrap_or(false) {
                 USER_POSITIONED.store(true, Ordering::Relaxed);
+            }
+        }
+        WindowEvent::Resized(_) => {
+            if panel.is_visible().unwrap_or(false) {
+                USER_SIZED.store(true, Ordering::Relaxed);
             }
         }
         _ => {}
@@ -127,31 +160,80 @@ fn state_path(app: &AppHandle) -> Option<PathBuf> {
         .map(|dir| dir.join("window.json"))
 }
 
-/// The last-saved panel position, if any.
-fn load_position(app: &AppHandle) -> Option<(i32, i32)> {
-    let contents = std::fs::read_to_string(state_path(app)?).ok()?;
-    let pos: SavedPosition = serde_json::from_str(&contents).ok()?;
-    Some((pos.x, pos.y))
+/// The last-saved panel geometry (position and/or size), or defaults if absent.
+fn load_window(app: &AppHandle) -> SavedWindow {
+    state_path(app)
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|c| serde_json::from_str(&c).ok())
+        .unwrap_or_default()
 }
 
-/// Persist the panel's current position (best-effort) so it reopens there — but
-/// only if the user actually chose it, so a default/anchor spot is never saved.
-fn save_if_user_positioned(window: &WebviewWindow) {
-    if !USER_POSITIONED.load(Ordering::Relaxed) {
+/// Persist the panel's current geometry (best-effort) so it reopens the same —
+/// position only if the user dragged it, size only if the user resized it, so a
+/// default anchor/size is never saved (P2-012).
+fn save_geometry(window: &WebviewWindow) {
+    let positioned = USER_POSITIONED.load(Ordering::Relaxed);
+    let sized = USER_SIZED.load(Ordering::Relaxed);
+    if !positioned && !sized {
         return;
     }
     let app = window.app_handle();
-    let Ok(pos) = window.outer_position() else {
-        return;
-    };
     let Some(path) = state_path(app) else {
         return;
     };
+    let mut saved = SavedWindow::default();
+    if positioned {
+        if let Ok(pos) = window.outer_position() {
+            saved.x = Some(pos.x);
+            saved.y = Some(pos.y);
+        }
+    }
+    if sized {
+        if let Ok(size) = window.inner_size() {
+            saved.width = Some(size.width);
+            saved.height = Some(size.height);
+        }
+    }
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if let Ok(json) = serde_json::to_string(&SavedPosition { x: pos.x, y: pos.y }) {
+    if let Ok(json) = serde_json::to_string(&saved) {
         let _ = std::fs::write(path, json);
+    }
+}
+
+/// Apply or clear the macOS vibrancy material behind the panel (P2-012). The
+/// window is created transparent; with vibrancy off the webview's opaque CSS
+/// background fills it, so it looks like a normal solid panel. macOS renders the
+/// material opaque automatically when the user has Reduce Transparency on (a11y).
+/// No-op on non-macOS.
+pub fn apply_translucency(window: &WebviewWindow, enabled: bool) {
+    #[cfg(target_os = "macos")]
+    {
+        use window_vibrancy::{
+            apply_vibrancy, clear_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
+        };
+        if enabled {
+            // `Sidebar` adapts to light/dark; `Active` keeps it lit (we hide on blur).
+            let _ = apply_vibrancy(
+                window,
+                NSVisualEffectMaterial::Sidebar,
+                Some(NSVisualEffectState::Active),
+                None,
+            );
+        } else {
+            let _ = clear_vibrancy(window);
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (window, enabled);
+}
+
+/// Apply the translucency preference to the panel window by label (P2-012), used
+/// by the `set_translucency` command so the toggle takes effect immediately.
+pub fn set_translucency(app: &AppHandle, enabled: bool) {
+    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
+        apply_translucency(&window, enabled);
     }
 }
 

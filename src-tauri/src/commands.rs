@@ -25,12 +25,15 @@ pub fn get_settings(app: AppHandle) -> Settings {
 
 #[tauri::command]
 pub fn save_settings(app: AppHandle, mut settings: Settings) -> Result<()> {
-    // `startup` (launch-at-login + its one-time consent) is server-authoritative:
-    // it is changed only via `set_launch_at_login`. The translate view and the
-    // settings view each hold their own loaded `Settings`, so a full-object save
-    // from a possibly-stale copy must NOT overwrite startup, or it could undo a
-    // just-made launch-at-login choice (P1-001). Preserve the on-disk value.
-    settings.startup = config::load(&app).startup;
+    // `startup` (launch-at-login, P1-001) and `ui.translucent` (P2-012) are
+    // server-authoritative: each is changed only via its own command
+    // (`set_launch_at_login` / `set_translucency`). The translate and settings
+    // views each hold their own loaded `Settings`, so a full-object save from a
+    // possibly-stale copy must NOT overwrite these, or it could undo a just-made
+    // choice. Preserve the on-disk values.
+    let on_disk = config::load(&app);
+    settings.startup = on_disk.startup;
+    settings.ui.translucent = on_disk.ui.translucent;
     config::save(&app, &settings)
 }
 
@@ -270,6 +273,19 @@ pub async fn translate_stream(
         .translate_stream(&key, &request.model, &plan.prompt, &sink)
         .await?;
     Ok(finish(&request, plan, started, text))
+}
+
+/// Toggle the macOS panel translucency (P2-012) and apply it immediately. Like
+/// launch-at-login, `ui.translucent` is server-authoritative here: this persists
+/// it and updates the live window, so the toggle and the on-disk value agree and
+/// can't be clobbered by a stale full-object `save_settings` from another view.
+#[tauri::command]
+pub fn set_translucency(app: AppHandle, enabled: bool) -> Result<()> {
+    let mut settings = config::load(&app);
+    settings.ui.translucent = enabled;
+    config::save(&app, &settings)?;
+    crate::windows::set_translucency(&app, enabled);
+    Ok(())
 }
 
 /// Check GitHub Releases for a newer version (P2-007 manual / FR-060/061). The

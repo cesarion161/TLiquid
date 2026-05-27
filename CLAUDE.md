@@ -42,15 +42,18 @@ an error otherwise. Always interact through the window `pnpm tauri dev` opens.
 TLiquid is **one window** — a frameless menu-bar panel anchored under the tray icon, in the
 spirit of Raycast, Docker Desktop's tray panel, and JetBrains Toolbox. There is no separate
 settings or result window: those are **views inside the one panel**, switched by a `$state`
-variable in `App.svelte` (`view: "translate" | "settings"`), not by routing or by opening
-new windows. So there is a single `index.html` → `src/main.ts` → `App.svelte`; `Settings.svelte`
-and `Result.svelte` are child components of `App`, not window entry points. Adding a "screen"
-means adding a component and a branch to `App.svelte`'s view switch — **not** a new HTML
-entry or window.
+variable in `App.svelte` (`view: "translate" | "settings" | "notifications"`), not by routing or
+by opening new windows. So there is a single `index.html` → `src/main.ts` → `App.svelte`;
+`Settings.svelte` and `Result.svelte` are child components of `App`, not window entry points.
+Adding a "screen" means adding a component and a branch to `App.svelte`'s view switch — **not** a
+new HTML entry or window. The **translate view is the always-present base layer**; Settings and
+Notifications render as a **fixed-width overlay pane** (`.overlay`, right-aligned, ~340px) sliding
+over part of it with a click-to-close scrim (P2-012), so the panel doesn't look sparse when resized
+large — they are not full-window replacements.
 
 The window itself (`src-tauri/src/windows.rs`, label `"main"`) is:
-- **Created once at startup, hidden** (`create_panel`), so summoning it is an instant `show`/`hide`, never a fresh webview load. Dev builds auto-show it; release stays hidden until summoned. It's a compact size (360×270) — the input and translation areas scroll on overflow.
-- **Frameless + `always_on_top` + `visible_on_all_workspaces`**, which — combined with the macOS Accessory activation policy set in `lib.rs` — lets it float over other apps including fullscreen Spaces. The slim titlebar (drag handle + gear/back, no title text) is drawn in the UI (`.titlebar` with `data-tauri-drag-region`); dragging needs the `core:window:allow-start-dragging` capability.
+- **Created once at startup, hidden** (`create_panel`), so summoning it is an instant `show`/`hide`, never a fresh webview load. Dev builds auto-show it; release stays hidden until summoned. Default size 360×270; **resizable but never smaller** (`min_inner_size` = the default), with the inner layout growing proportionally (P2-012). A user resize is remembered across restarts alongside the position (`window.json`; `USER_SIZED`/`USER_POSITIONED`, persisted independently).
+- **Frameless + transparent + `always_on_top` + `visible_on_all_workspaces`**, which — combined with the macOS Accessory activation policy set in `lib.rs` — lets it float over other apps including fullscreen Spaces. **Transparent** (needs `app.macOSPrivateApi` + the `macos-private-api` tauri feature) so the optional macOS **vibrancy** can show through: `windows::apply_translucency` applies/clears an `NSVisualEffectView` (the `window-vibrancy` crate) per `config.ui.translucent` (default on; `set_translucency` command toggles it live; the frontend flips a `body.translucent` class that makes `.panel`/`.titlebar` transparent — surfaces stay opaque for legibility). With translucency off, the opaque CSS background fills the transparent window so it looks solid; AppKit renders the material opaque when Reduce-Transparency is on (P2-012). The slim titlebar (drag handle + bell/gear/back, no title text) is drawn in the UI (`.titlebar` with `data-tauri-drag-region`); dragging needs the `core:window:allow-start-dragging` capability.
 - **Summon + auto-hide (Spotlight-style)**: `show_panel` is the single entry point (there is no toggle) — `tray.rs` left-click, the tray menu's "Open"/"Settings…", and the translate hotkey (via `on_trigger`, for any outcome — captured text, a capture error, or no selection) all call it. Until the user drags the window, each summon anchors it under the tray icon via `position_under_tray` (reads the tray icon's screen `rect()` + the pure, unit-tested `panel_origin` clamping). The panel **auto-hides on blur** (`Focused(false)` → `hide`) and on **Esc** (App.svelte) — re-summon via the tray or the hotkey. A `CloseRequested` also hides rather than destroys (keeps the menu-bar app alive).
 - **Draggable + position-remembering** (Raycast-style): the user can drag the panel by the titlebar; once dragged it stops re-anchoring and the position is remembered across restarts (`window.json` beside `settings.json`, validated against connected monitors). Only genuine user drags are saved — moves while the window is hidden (our anchoring/restoring) are ignored (`USER_POSITIONED`). Tray right-click opens the menu; "Settings…" also emits a `navigate` event the frontend listens for to switch views.
 

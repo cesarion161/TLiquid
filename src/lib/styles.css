@@ -38,7 +38,11 @@
   font-size: var(--tl-fs-base);
   line-height: 1.5;
   color: var(--tl-text);
-  background: var(--tl-bg);
+  /* The OS window is transparent (for optional vibrancy, P2-012); `.panel`
+     paints the opaque background by default, so it looks like a normal solid
+     window. `.translucent` (set from settings) makes it transparent to reveal
+     the macOS vibrancy layer applied in Rust. */
+  background: transparent;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -93,11 +97,19 @@ body {
 
 /* ── Panel shell ─────────────────────────────────────────────────────────── */
 
-/* The panel: a frameless menu-bar window with a draggable custom titlebar. */
+/* The panel: a frameless menu-bar window with a draggable custom titlebar.
+   Paints the opaque background by default; `.translucent` makes it (and the
+   titlebar) transparent so the macOS vibrancy shows through (P2-012). */
 .panel {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background: var(--tl-bg);
+}
+
+body.translucent .panel,
+body.translucent .titlebar {
+  background: transparent;
 }
 
 /* Slim drag bar: product name + version on the left, bell/gear (or back) right. */
@@ -145,6 +157,56 @@ body {
   /* Small top gap so the first field doesn't touch the titlebar. */
   padding: var(--tl-sp-2) var(--tl-sp-3) var(--tl-sp-3);
   overflow-y: auto;
+}
+
+/* ── Overlay panes (P2-012) ──────────────────────────────────────────────── */
+
+/* Region below the titlebar. The translate view fills it; Settings and
+   Notifications slide in as a fixed-width pane over part of it. */
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Clip the closed (off-screen-right) overlay so it can't induce overflow. */
+  overflow: hidden;
+}
+
+/* Dim + click-to-close layer over the translate base while a pane is open. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: none;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.18);
+  cursor: default;
+}
+
+/* Fixed-width pane sliding in from the right — never full-width, so it doesn't
+   look sparse when the window is resized large. Solid surface for legibility,
+   even in translucent mode (it floats above the vibrant base). */
+.overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 340px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--tl-surface);
+  border-left: 1px solid var(--tl-border);
+  transform: translateX(100%);
+  transition: transform 0.18s ease;
+}
+
+/* Shadow only while open, so the off-screen pane casts no strip over translate. */
+.overlay.open {
+  transform: translateX(0);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
 }
 
 /* ── Form primitives ─────────────────────────────────────────────────────── */
@@ -206,6 +268,12 @@ body {
 .grow {
   flex: 1;
   min-height: 0;
+}
+
+/* In a grown field, the textarea fills it so the input area scales with the
+   window (P2-012 proportional resize); `min-height` keeps it usable when small. */
+.field.grow > .textarea {
+  flex: 1;
 }
 
 /* Keep a view mounted (preserving its state) while off-screen. */

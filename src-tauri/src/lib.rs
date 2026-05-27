@@ -150,6 +150,7 @@ pub fn run() {
             commands::is_launch_at_login,
             commands::check_for_update,
             commands::download_and_install_update,
+            commands::set_translucency,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TLiquid");

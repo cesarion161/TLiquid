@@ -318,7 +318,7 @@
 </script>
 
 <section class="body" class:hidden>
-  <div class="field">
+  <div class="field grow">
     <textarea
       class="textarea"
       aria-label="Text to translate"
