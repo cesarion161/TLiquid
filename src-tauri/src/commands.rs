@@ -4,7 +4,7 @@
 use crate::config::{self, Settings};
 use crate::error::{AppError, Result};
 use crate::providers::{self, ProviderId, ProviderMeta, TranslationRequest, TranslationResponse};
-use crate::{secrets, shortcuts, translation};
+use crate::{diagnostics, secrets, shortcuts, translation};
 use tauri::AppHandle;
 
 #[tauri::command]
@@ -45,6 +45,31 @@ pub fn apply_shortcuts(app: AppHandle) -> Vec<String> {
 #[tauri::command]
 pub fn shortcut_errors(app: AppHandle) -> Vec<String> {
     shortcuts::stored_errors(&app)
+}
+
+/// Open macOS System Settings at Privacy & Security → Accessibility, so the user
+/// can grant the permission selected-text capture needs (P0-016, FR-018).
+#[tauri::command]
+pub fn open_accessibility_settings() -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| AppError::Capture(format!("Could not open System Settings: {e}")))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(())
+    }
+}
+
+/// A local, copy-pasteable diagnostics report for bug reports (FR-065). Contains
+/// only non-sensitive metadata and is never uploaded (FR-064).
+#[tauri::command]
+pub fn diagnostics(app: AppHandle) -> String {
+    diagnostics::collect(&app).to_report()
 }
 
 #[tauri::command]

@@ -13,6 +13,7 @@
 mod capture;
 mod commands;
 mod config;
+mod diagnostics;
 mod error;
 mod languages;
 mod providers;
@@ -96,6 +97,8 @@ pub fn run() {
             commands::translate,
             commands::apply_shortcuts,
             commands::shortcut_errors,
+            commands::open_accessibility_settings,
+            commands::diagnostics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TLiquid");

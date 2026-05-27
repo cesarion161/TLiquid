@@ -7,13 +7,18 @@
     error = null,
     busy = false,
     copied = false,
+    showPermissionHelp = false,
     onCopy,
+    onOpenAccessibility,
   }: {
     output?: string | null;
     error?: string | null;
     busy?: boolean;
     copied?: boolean;
+    // Shown for a capture error: a shortcut to grant Accessibility (P0-016).
+    showPermissionHelp?: boolean;
     onCopy: () => void;
+    onOpenAccessibility?: () => void;
   } = $props();
 </script>
 
@@ -36,6 +41,13 @@
       Translation output appears here.
     {/if}
   </div>
+  {#if error && showPermissionHelp}
+    <div class="row">
+      <button class="btn" onclick={onOpenAccessibility}>
+        Open Accessibility Settings
+      </button>
+    </div>
+  {/if}
   <div class="row">
     <button class="btn" onclick={onCopy} disabled={!output}>Copy</button>
     <span class="hint">{copied ? "Copied!" : "Press Enter to copy"}</span>

@@ -10,6 +10,7 @@
   import {
     getSettings,
     translate as runTranslate,
+    openAccessibilitySettings,
     type Settings,
     type Language,
     type RoutingMode,
@@ -43,6 +44,9 @@
   let output = $state<string | null>(null);
   let error = $state<string | null>(null);
   let copied = $state(false);
+  // True when the current error came from selected-text capture, so the result
+  // pane can offer the Accessibility-permission shortcut (P0-016).
+  let permissionHelp = $state(false);
   let sourceEl = $state<HTMLTextAreaElement | null>(null);
 
   // A default model must be configured (in Settings → Models) to translate.
@@ -102,6 +106,7 @@
     error = null;
     copied = false;
     output = null;
+    permissionHelp = false; // a provider error is not a permission problem
     translating = true;
     try {
       const resp = await runTranslate({
@@ -143,9 +148,10 @@
   // instead of erroring (PRD §10.3).
   async function handleRequest(req: ShortcutRequest) {
     if (req.error) {
-      // Capture failed: show the reason and clear any prior result/source so
-      // stale text doesn't linger under the error.
+      // Capture failed: show the reason (with the Accessibility shortcut) and
+      // clear any prior result/source so stale text doesn't linger.
       error = req.error;
+      permissionHelp = true;
       sourceText = "";
       output = null;
       copied = false;
@@ -253,5 +259,13 @@
     </button>
   </div>
 
-  <Result {output} {error} busy={translating} {copied} onCopy={copy} />
+  <Result
+    {output}
+    {error}
+    busy={translating}
+    {copied}
+    showPermissionHelp={permissionHelp}
+    onCopy={copy}
+    onOpenAccessibility={openAccessibilitySettings}
+  />
 </section>

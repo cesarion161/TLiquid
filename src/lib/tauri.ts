@@ -91,6 +91,13 @@ export const applyShortcuts = (): Promise<string[]> => invoke("apply_shortcuts")
 /** Registration errors from the most recent shortcut apply. */
 export const shortcutErrors = (): Promise<string[]> => invoke("shortcut_errors");
 
+/** Open macOS System Settings → Privacy & Security → Accessibility (FR-018). */
+export const openAccessibilitySettings = (): Promise<void> =>
+  invoke("open_accessibility_settings");
+
+/** Local, copy-pasteable diagnostics report (no upload; FR-064/FR-065). */
+export const diagnostics = (): Promise<string> => invoke("diagnostics");
+
 export const setProviderKey = (provider: ProviderId, key: string): Promise<void> =>
   invoke("set_provider_key", { provider, key });
 

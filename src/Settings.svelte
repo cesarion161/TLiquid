@@ -6,6 +6,7 @@
   import LanguageSettings from "./LanguageSettings.svelte";
   import ShortcutSettings from "./ShortcutSettings.svelte";
   import ProviderSettings from "./ProviderSettings.svelte";
+  import PrivacySettings from "./PrivacySettings.svelte";
 
   // Settings view of the panel (not a separate window). The version is passed
   // down from App so this view doesn't re-fetch it.
@@ -81,10 +82,7 @@
     <p class="hint">What happens with a translation result.</p>
   </div>
 
-  <div class="section">
-    <h2 class="section__title">Privacy</h2>
-    <p class="hint">TLiquid sends text only to your chosen provider. No telemetry.</p>
-  </div>
+  <PrivacySettings />
 
   <div class="section">
     <h2 class="section__title">Updates</h2>
