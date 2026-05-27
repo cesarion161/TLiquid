@@ -96,7 +96,7 @@ struct ShortcutPayload {
 fn on_trigger(app: &AppHandle, action: Action) {
     let payload = match action {
         Action::OpenPanel => {
-            let _ = windows::show_panel(app, None);
+            let _ = windows::show_panel(app);
             ShortcutPayload {
                 action: "open",
                 text: None,
@@ -110,7 +110,7 @@ fn on_trigger(app: &AppHandle, action: Action) {
                 Ok(t) => (Some(t), None),
                 Err(e) => (None, Some(e.to_string())),
             };
-            let _ = windows::show_panel(app, None);
+            let _ = windows::show_panel(app);
             ShortcutPayload {
                 action: if matches!(action, Action::Primary) {
                     "primary"

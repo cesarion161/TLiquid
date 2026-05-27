@@ -222,12 +222,6 @@
 </script>
 
 <section class="body">
-  {#if !ready}
-    <p class="hint">
-      Set a default provider and model in Settings (the gear above) to translate.
-    </p>
-  {/if}
-
   <div class="field">
     <label class="label" for="source-text">Text</label>
     <textarea

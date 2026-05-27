@@ -1,9 +1,10 @@
 //! macOS menu-bar (tray) shell (P0-002).
 //!
-//! Left-clicking the tray toggles the single TLiquid panel, anchored under the
-//! icon (Raycast / Docker Desktop tray / JetBrains Toolbox style). Right-click
-//! opens a small menu (Open, Settings…, Quit). "Settings…" opens the panel and
-//! asks it to switch to its Settings view via the `navigate` event.
+//! Left-clicking the tray summons the single TLiquid panel, anchored under the
+//! icon (Raycast / Docker Desktop tray / JetBrains Toolbox style); it auto-hides
+//! when it loses focus (see `windows`). Right-click opens a small menu (Open,
+//! Settings…, Quit). "Settings…" opens the panel and asks it to switch to its
+//! Settings view via the `navigate` event.
 
 use crate::windows;
 use tauri::{
@@ -11,6 +12,9 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter,
 };
+
+/// Tray icon id, used to look up its screen rect for panel anchoring.
+pub const TRAY_ID: &str = "tliquid";
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open TLiquid", true, None::<&str>)?;
@@ -24,18 +28,18 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .expect("bundled default window icon")
         .clone();
 
-    TrayIconBuilder::with_id("tliquid")
+    TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .tooltip("TLiquid")
         .menu(&menu)
-        // Left-click toggles the panel; the menu opens on right-click.
+        // Left-click summons the panel; the menu opens on right-click.
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => {
-                let _ = windows::show_panel(app, None);
+                let _ = windows::show_panel(app);
             }
             "settings" => {
-                let _ = windows::show_panel(app, None);
+                let _ = windows::show_panel(app);
                 // Ask the panel to switch to its Settings view.
                 let _ = app.emit_to(windows::PANEL_LABEL, "navigate", "settings");
             }
@@ -46,11 +50,10 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
-                position,
                 ..
             } = event
             {
-                let _ = windows::toggle_panel(tray.app_handle(), Some(position));
+                let _ = windows::show_panel(tray.app_handle());
             }
         })
         .build(app)?;

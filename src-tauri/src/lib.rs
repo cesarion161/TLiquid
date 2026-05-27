@@ -36,7 +36,7 @@ pub fn run() {
     // launch just summons the existing panel.
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-        let _ = windows::show_panel(app, None);
+        let _ = windows::show_panel(app);
     }));
 
     builder
@@ -78,7 +78,7 @@ pub fn run() {
             // In dev, surface the panel immediately so the UI is visible without
             // clicking the tray. Release stays hidden until summoned.
             #[cfg(debug_assertions)]
-            windows::show_panel(app.handle(), None)?;
+            windows::show_panel(app.handle())?;
 
             Ok(())
         })

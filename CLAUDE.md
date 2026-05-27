@@ -49,9 +49,9 @@ means adding a component and a branch to `App.svelte`'s view switch — **not** 
 entry or window.
 
 The window itself (`src-tauri/src/windows.rs`, label `"main"`) is:
-- **Created once at startup, hidden** (`create_panel`), so summoning it is an instant `show`/`hide`, never a fresh webview load. Dev builds auto-show it; release stays hidden until summoned.
-- **Frameless + `always_on_top` + `visible_on_all_workspaces`**, which — combined with the macOS Accessory activation policy set in `lib.rs` — lets it float over other apps including fullscreen Spaces. The titlebar is drawn in the UI (`.titlebar` with `data-tauri-drag-region`).
-- **Anchored under the tray icon**: `tray.rs` left-click calls `toggle_panel` with the click position; `windows::position_under` centers the panel beneath it, clamped to the monitor. Right-click opens the tray menu; "Settings…" shows the panel and emits a `navigate` event the frontend listens for to switch views.
+- **Created once at startup, hidden** (`create_panel`), so summoning it is an instant `show`/`hide`, never a fresh webview load. Dev builds auto-show it; release stays hidden until summoned. It's a compact size (360×400) — the input and translation areas scroll on overflow.
+- **Frameless + `always_on_top` + `visible_on_all_workspaces`**, which — combined with the macOS Accessory activation policy set in `lib.rs` — lets it float over other apps including fullscreen Spaces. The slim titlebar (drag handle + gear/back, no title text) is drawn in the UI (`.titlebar` with `data-tauri-drag-region`).
+- **Summon + auto-hide (Spotlight-style)**: `show_panel` is the single entry point — `tray.rs` left-click, the tray menu's "Open"/"Settings…", and the global hotkeys all call it (there is no toggle). It anchors the panel under the tray icon via `position_under_tray`, which reads the tray icon's screen `rect()` (so it works for hotkey summons too, not just clicks) and feeds the pure, unit-tested `panel_origin` clamping. The panel **auto-hides on blur** (`WindowEvent::Focused(false)` → `hide`) — click outside or switch apps to dismiss; re-summon via the tray or a hotkey. A close gesture (`CloseRequested`) also hides rather than destroys (keeps the menu-bar app alive). Tray right-click opens the menu; "Settings…" also emits a `navigate` event the frontend listens for to switch views.
 
 ### The IPC boundary (keep these in sync)
 `src/lib/tauri.ts` is the **only** place the frontend calls `invoke` — Svelte components import

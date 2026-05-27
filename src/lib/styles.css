@@ -100,20 +100,15 @@ body {
   height: 100%;
 }
 
+/* Slim drag bar; the gear/back control sits at the right (no title text). */
 .titlebar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--tl-sp-2) var(--tl-sp-2) var(--tl-sp-2) var(--tl-sp-4);
-  border-bottom: 1px solid var(--tl-border);
+  justify-content: flex-end;
+  padding: var(--tl-sp-1) var(--tl-sp-1);
   background: var(--tl-surface);
   user-select: none;
   -webkit-user-select: none;
-}
-
-.title {
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .icon-btn {
@@ -123,6 +118,9 @@ body {
   color: var(--tl-text-muted);
   font-size: 15px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: var(--tl-sp-1) var(--tl-sp-2);
   border-radius: var(--tl-radius-sm);
   cursor: pointer;
@@ -143,8 +141,8 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--tl-sp-3);
-  padding: var(--tl-sp-4);
+  gap: var(--tl-sp-2);
+  padding: 0 var(--tl-sp-3) var(--tl-sp-3);
   overflow-y: auto;
 }
 
@@ -175,7 +173,7 @@ body {
 }
 
 .textarea {
-  min-height: 96px;
+  min-height: 64px;
   resize: none;
 }
 
@@ -206,10 +204,11 @@ body {
   appearance: none;
   border: 1px solid var(--tl-border);
   border-radius: var(--tl-radius);
-  padding: var(--tl-sp-2) var(--tl-sp-4);
+  padding: 6px var(--tl-sp-3);
   background: var(--tl-surface);
   color: var(--tl-text);
   font: inherit;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.12s ease;
@@ -240,7 +239,7 @@ body {
 /* Translation output area: fills remaining height and scrolls on overflow. */
 .output {
   flex: 1;
-  min-height: 96px;
+  min-height: 64px;
   padding: var(--tl-sp-3);
   border: 1px solid var(--tl-border);
   border-radius: var(--tl-radius);

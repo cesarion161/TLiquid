@@ -163,7 +163,9 @@ Then translate:
   section is at the top).
 - **Open panel (⌘⌥T):** just summons the panel.
 
-Shortcuts can be toggled off entirely in **Settings → Shortcuts** (custom
+The panel drops down under the menu-bar icon and **auto-hides when it loses
+focus** (click outside or switch apps) — summon it again from the tray icon or a
+hotkey. Shortcuts can be toggled off entirely in **Settings → Shortcuts** (custom
 remapping is a later phase).
 
 ### How your API keys are stored

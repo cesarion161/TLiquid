@@ -77,9 +77,8 @@
 </script>
 
 <div class="panel">
-  <!-- Frameless window: this bar is the drag handle and houses the gear/back. -->
+  <!-- Frameless window: this slim bar is the drag handle and houses the gear/back. -->
   <header class="titlebar" data-tauri-drag-region>
-    <span class="title">TLiquid</span>
     <button
       class="icon-btn"
       title={view === "settings" ? "Back" : "Settings"}
