@@ -24,15 +24,17 @@
 </script>
 
 <div class="field grow">
-  <div class="row">
-    <span id="translation-label" class="label grow">Translation</span>
-    {#if output}
+  {#if output}
+    <!-- Copy affordance lives in the top-right above the output, so the result
+         area isn't crowded by a button row below it. -->
+    <div class="row">
+      <span class="grow"></span>
       <span class="hint">{copied ? "Copied!" : "Press Enter to copy"}</span>
       <button
         class="icon-btn"
         onclick={onCopy}
         aria-label="Copy translation"
-        title="Copy"
+        title="Copy translation"
       >
         <svg
           width="15"
@@ -49,14 +51,14 @@
           <path d="M5 15V5a2 2 0 0 1 2-2h10"></path>
         </svg>
       </button>
-    {/if}
-  </div>
+    </div>
+  {/if}
 
   <div
     class="output"
     class:hint={!output && !error}
     role="region"
-    aria-labelledby="translation-label"
+    aria-label="Translation"
     aria-live="polite"
   >
     {#if error}

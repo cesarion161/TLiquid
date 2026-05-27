@@ -23,6 +23,16 @@
   let { settings, onChange }: { settings: Settings; onChange: () => void } =
     $props();
 
+  // A sensible, fast default model per provider so a freshly-keyed provider can
+  // translate immediately (overridable later in Models). If one is ever rejected
+  // by a provider, the user just picks another from the model list.
+  const DEFAULT_MODELS: Partial<Record<ProviderId, string>> = {
+    openai: "gpt-4o-mini",
+    anthropic: "claude-3-5-haiku-latest",
+    gemini: "gemini-2.0-flash",
+    openrouter: "openai/gpt-4o-mini",
+  };
+
   type Status =
     | { kind: "none" }
     | { kind: "saving" }
@@ -78,10 +88,23 @@
     status[id] = { kind: "saving" };
     try {
       await setProviderKey(id, key);
+      // Adopt this provider as the default if the current default has no key
+      // yet (covers the first key saved). Checked BEFORE recording presence.
+      const adoptAsDefault = !keyPresence[settings.defaultProvider];
+
       keyPresence[id] = true;
       settings.providers[id].enabled = true;
+      // Seed a ready-to-use model so the user can translate without extra steps.
+      if (!settings.providers[id].defaultModel) {
+        settings.providers[id].defaultModel = DEFAULT_MODELS[id] ?? null;
+      }
       keyInput[id] = ""; // don't retain the key in the UI
       status[id] = { kind: "configured" };
+
+      if (adoptAsDefault) {
+        settings.defaultProvider = id;
+        settings.defaultModel = settings.providers[id].defaultModel ?? null;
+      }
       onChange();
       if (id === settings.defaultProvider) await loadModels();
     } catch (e) {
@@ -123,7 +146,10 @@
 
   async function setDefaultProvider(id: ProviderId) {
     settings.defaultProvider = id;
-    settings.defaultModel = null; // model belongs to the previous provider
+    // Use this provider's remembered/hardcoded default model so it's immediately
+    // usable, rather than clearing it.
+    settings.defaultModel =
+      settings.providers[id].defaultModel ?? DEFAULT_MODELS[id] ?? null;
     onChange();
     await loadModels();
   }

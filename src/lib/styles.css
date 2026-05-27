@@ -198,6 +198,11 @@ body {
   min-height: 0;
 }
 
+/* Keep a view mounted (preserving its state) while off-screen. */
+.hidden {
+  display: none !important;
+}
+
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 
 .btn {

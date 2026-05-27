@@ -28,9 +28,16 @@
   };
   let {
     request = null,
+    active = true,
+    hidden = false,
     onOpenSettings,
   }: {
     request?: ShortcutRequest | null;
+    // Whether this is the visible view. The component stays mounted while hidden
+    // (preserving the typed text + result); it re-reads settings when it becomes
+    // active again so newly-saved providers/models/languages are picked up.
+    active?: boolean;
+    hidden?: boolean;
     // Called when the secondary hotkey fires but no secondary language is
     // configured — App switches to the Settings view (P0-015, PRD §10.3).
     onOpenSettings?: () => void;
@@ -73,15 +80,20 @@
     return opts;
   });
 
-  onMount(async () => {
-    await ensureSettings();
+  onMount(() => {
     window.addEventListener("keydown", onWindowKeydown);
   });
 
   onDestroy(() => window.removeEventListener("keydown", onWindowKeydown));
 
+  // Re-read settings whenever the view becomes active (on mount, and on every
+  // return from Settings), so a just-saved provider/model/language is reflected.
+  $effect(() => {
+    if (active) void reloadSettings();
+  });
+
   // Load settings once (deduped). Awaited by runTranslation so a hotkey request
-  // that arrives before onMount finishes still translates once settings load.
+  // that arrives before settings load still translates once they do.
   async function ensureSettings(): Promise<Settings | null> {
     if (settings) return settings;
     if (!isTauri()) return null;
@@ -92,6 +104,17 @@
       error = `Could not load settings: ${e}`;
     }
     return settings;
+  }
+
+  // Force a fresh settings read (used when the view (re)activates).
+  async function reloadSettings() {
+    if (!isTauri()) return;
+    try {
+      settingsPromise = getSettings();
+      settings = await settingsPromise;
+    } catch (e) {
+      error = `Could not load settings: ${e}`;
+    }
   }
 
   // The single translation path used by the manual button and the hotkey flow.
@@ -212,21 +235,21 @@
   }
 
   // After a translation, Enter (when not editing the input) copies the result
-  // and dismisses the panel.
+  // and dismisses the panel. Ignored while the Settings view is active so it
+  // can't fire on a stale result from behind Settings.
   function onWindowKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey && output && e.target !== sourceEl) {
+    if (active && e.key === "Enter" && !e.shiftKey && output && e.target !== sourceEl) {
       e.preventDefault();
       copyAndDismiss();
     }
   }
 </script>
 
-<section class="body">
+<section class="body" class:hidden>
   <div class="field">
-    <label class="label" for="source-text">Text</label>
     <textarea
-      id="source-text"
       class="textarea"
+      aria-label="Text to translate"
       placeholder="Type or paste text to translate…  (Enter to translate, Shift+Enter for a new line)"
       bind:this={sourceEl}
       bind:value={sourceText}

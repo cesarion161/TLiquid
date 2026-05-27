@@ -17,7 +17,10 @@
   // mutate `settings` and call `persist`. P0-003 laid out the section shells;
   // P0-006 fills Languages. Shortcuts (P0-007), Providers & Models (P0-009),
   // Output/Privacy (P0-017), and Updates/About (P0-018) follow.
-  let { version = "—" }: { version?: string } = $props();
+  // `hidden` keeps this view mounted but off-screen while the translate view is
+  // active (so neither view loses its state on a switch).
+  let { version = "—", hidden = false }: { version?: string; hidden?: boolean } =
+    $props();
 
   let configPath = $state<string | null>(null);
   let settings = $state<Settings | null>(null);
@@ -59,7 +62,7 @@
   }
 </script>
 
-<section class="body">
+<section class="body" class:hidden>
   {#if saveError}
     <p class="error">{saveError}</p>
   {/if}

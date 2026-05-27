@@ -93,13 +93,14 @@
     <section class="body">
       <p class="error">{error}</p>
     </section>
-  {:else if view === "settings"}
-    <Settings {version} />
   {:else}
-    <!-- Manual translation surface (PRD §10.4/§10.5). Owns its own state and the
-         real provider call; remounts on each switch back so it re-reads settings.
-         `request` carries a selected-text hotkey capture to translate (P0-014/15). -->
+    <!-- Both views stay mounted (hidden, not unmounted) so the translate view
+         keeps its typed text and result while you visit Settings. Translate
+         re-reads settings whenever it becomes active again, picking up changes.
+         `request` carries a selected-text hotkey capture to translate. -->
     <Translate
+      hidden={view !== "translate"}
+      active={view === "translate"}
       request={shortcutRequest}
       onOpenSettings={() => {
         view = "settings";
@@ -107,5 +108,6 @@
         shortcutRequest = null;
       }}
     />
+    <Settings {version} hidden={view !== "settings"} />
   {/if}
 </div>
