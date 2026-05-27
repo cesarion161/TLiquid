@@ -4,6 +4,7 @@
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { getSettings, saveSettings, settingsPath, type Settings } from "./lib/tauri";
   import LanguageSettings from "./LanguageSettings.svelte";
+  import ProviderSettings from "./ProviderSettings.svelte";
 
   // Settings view of the panel (not a separate window). The version is passed
   // down from App so this view doesn't re-fetch it.
@@ -74,15 +75,9 @@
     <p class="hint">Global hotkeys for primary, secondary, and manual translation.</p>
   </div>
 
-  <div class="section">
-    <h2 class="section__title">Providers</h2>
-    <p class="hint">API keys and connection status for each LLM provider.</p>
-  </div>
-
-  <div class="section">
-    <h2 class="section__title">Models</h2>
-    <p class="hint">Default provider and model used for translation.</p>
-  </div>
+  {#if settings}
+    <ProviderSettings {settings} onChange={persist} />
+  {/if}
 
   <div class="section">
     <h2 class="section__title">Output</h2>

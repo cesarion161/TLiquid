@@ -162,6 +162,7 @@ body {
   color: var(--tl-text-muted);
 }
 
+.input,
 .select,
 .textarea {
   width: 100%;
@@ -178,6 +179,7 @@ body {
   resize: none;
 }
 
+.input:disabled,
 .select:disabled,
 .textarea:disabled {
   opacity: 0.6;

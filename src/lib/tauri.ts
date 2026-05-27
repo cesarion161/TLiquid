@@ -98,6 +98,11 @@ export const testProviderKey = (
   key: string,
 ): Promise<boolean> => invoke("test_provider_key", { provider, key });
 
+/** Validate the provider's already-saved Keychain key (FR-040). */
+export const testProviderConnection = (
+  provider: ProviderId,
+): Promise<boolean> => invoke("test_provider_connection", { provider });
+
 export const listProviderModels = (provider: ProviderId): Promise<string[]> =>
   invoke("list_provider_models", { provider });
 

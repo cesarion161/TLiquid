@@ -50,10 +50,20 @@ pub fn has_provider_key(provider: ProviderId) -> Result<bool> {
     Ok(secrets::get_key(provider.as_str())?.is_some())
 }
 
-/// Test a provider connection with a candidate key (FR-040). Full validation
-/// lands with the provider adapters in P0-008/P0-009.
+/// Test a provider connection with a candidate key the user just typed (FR-040),
+/// before it's saved. `Ok(true)` accepted, `Ok(false)` rejected, `Err` failure.
 #[tauri::command]
 pub async fn test_provider_key(provider: ProviderId, key: String) -> Result<bool> {
+    providers::adapter(provider).validate_key(&key).await
+}
+
+/// Test the connection using the provider's already-saved key (FR-040), reading
+/// it from the Keychain so the frontend never has to hold a saved key.
+#[tauri::command]
+pub async fn test_provider_connection(provider: ProviderId) -> Result<bool> {
+    let key = secrets::get_key(provider.as_str())?.ok_or_else(|| {
+        AppError::Provider(format!("No API key configured for {}.", provider.as_str()))
+    })?;
     providers::adapter(provider).validate_key(&key).await
 }
 

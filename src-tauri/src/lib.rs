@@ -73,6 +73,7 @@ pub fn run() {
             commands::delete_provider_key,
             commands::has_provider_key,
             commands::test_provider_key,
+            commands::test_provider_connection,
             commands::list_provider_models,
             commands::translate,
         ])
