@@ -104,9 +104,12 @@ pub fn export_diagnostics(app: AppHandle) -> Result<String> {
     let dir = diagnostics::log_file_path(&app)
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
         .ok_or_else(|| AppError::Config("could not resolve the log directory".into()))?;
-    std::fs::create_dir_all(&dir).map_err(|e| AppError::Config(e.to_string()))?;
+    std::fs::create_dir_all(&dir).map_err(|e| {
+        AppError::Config(format!("could not create the diagnostics directory: {e}"))
+    })?;
     let path = dir.join("tliquid-diagnostics.txt");
-    std::fs::write(&path, bundle).map_err(|e| AppError::Config(e.to_string()))?;
+    std::fs::write(&path, bundle)
+        .map_err(|e| AppError::Config(format!("could not write the diagnostics file: {e}")))?;
     Ok(path.to_string_lossy().into_owned())
 }
 

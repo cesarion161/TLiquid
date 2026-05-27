@@ -89,17 +89,18 @@ fn recent_log_lines(app: &AppHandle) -> Vec<String> {
     lines[start..].iter().map(|s| s.to_string()).collect()
 }
 
-/// Count error/warn lines in a log tail by their level token (P1-007 "recent
-/// error categories"). Pure, so it is unit-tested. The level appears as a
-/// bracketed/standalone token in the log plugin's format, e.g. `[ERROR]`.
+/// Count error/warn lines in a log tail by their **bracketed level token**
+/// (P1-007 "recent error categories"). Matching `[ERROR]`/`[WARN]` rather than
+/// any substring avoids miscounting a line whose message merely contains the
+/// word "error". Pure, so it is unit-tested.
 fn count_levels(lines: &[String]) -> (usize, usize) {
     let mut errors = 0;
     let mut warns = 0;
     for line in lines {
         let upper = line.to_uppercase();
-        if upper.contains("ERROR") {
+        if upper.contains("[ERROR]") {
             errors += 1;
-        } else if upper.contains("WARN") {
+        } else if upper.contains("[WARN]") {
             warns += 1;
         }
     }
@@ -143,8 +144,12 @@ impl Diagnostics {
 
 /// The full diagnostics bundle (P1-007): the non-secret metadata report, a
 /// recent-error summary, and the tail of the app log — for a bug report. Local
-/// only; never uploaded (FR-064). Contains no keys/text by construction +
-/// logging discipline (see the module docs).
+/// only; never uploaded (FR-064).
+///
+/// Privacy note: the metadata section is covered by the structural no-secret
+/// guard test, but the appended log tail is unstructured — its FR-067 safety
+/// rests on TLiquid's logging discipline (no keys/text/prompts/responses are
+/// ever logged; see the module docs and the P0-017 audit), not on this struct.
 pub fn bundle(app: &AppHandle) -> String {
     let report = collect(app).to_report();
     let log = recent_log_lines(app);
