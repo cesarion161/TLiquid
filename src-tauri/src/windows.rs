@@ -119,15 +119,14 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
         }
         // We only reposition/resize the panel while it's hidden (before showing),
         // so a move/resize while it's visible is the user doing it — remember that.
-        WindowEvent::Moved(_) => {
-            if panel.is_visible().unwrap_or(false) {
-                USER_POSITIONED.store(true, Ordering::Relaxed);
-            }
+        // (Visibility is a match guard rather than a nested `if` so clippy's
+        // `collapsible_match` is happy on newer toolchains; a non-visible move/
+        // resize falls through to the no-op arm, same as before.)
+        WindowEvent::Moved(_) if panel.is_visible().unwrap_or(false) => {
+            USER_POSITIONED.store(true, Ordering::Relaxed);
         }
-        WindowEvent::Resized(_) => {
-            if panel.is_visible().unwrap_or(false) {
-                USER_SIZED.store(true, Ordering::Relaxed);
-            }
+        WindowEvent::Resized(_) if panel.is_visible().unwrap_or(false) => {
+            USER_SIZED.store(true, Ordering::Relaxed);
         }
         _ => {}
     });
