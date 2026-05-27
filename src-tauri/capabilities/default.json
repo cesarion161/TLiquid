@@ -5,6 +5,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-hide",
     "opener:default",
     "opener:allow-reveal-item-in-dir",
     "clipboard-manager:allow-read-text",

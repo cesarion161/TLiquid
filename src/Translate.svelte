@@ -5,6 +5,7 @@
   // re-reads the latest settings (default provider/model + languages).
   import { onMount, onDestroy } from "svelte";
   import { isTauri } from "@tauri-apps/api/core";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { writeText } from "@tauri-apps/plugin-clipboard-manager";
   import {
     getSettings,
@@ -90,11 +91,29 @@
 
   async function copy() {
     if (!output) return;
+    // Reset first so `copied` reflects only this attempt (copyAndDismiss gates
+    // on it) and a stale copy error doesn't linger over a successful re-copy.
+    copied = false;
+    error = null;
     try {
       await writeText(output);
       copied = true;
     } catch (e) {
       error = `Could not copy: ${e}`;
+    }
+  }
+
+  // Enter after a translation copies and dismisses the panel (PRD §10.4 step 8).
+  // The Copy button only copies (no dismiss).
+  async function copyAndDismiss() {
+    if (!output) return;
+    await copy();
+    if (copied) {
+      try {
+        await getCurrentWindow().hide();
+      } catch {
+        /* dismiss is best-effort; the copy already succeeded. */
+      }
     }
   }
 
@@ -106,11 +125,12 @@
     }
   }
 
-  // After a translation, Enter (when not editing the input) copies the result.
+  // After a translation, Enter (when not editing the input) copies the result
+  // and dismisses the panel.
   function onWindowKeydown(e: KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey && output && e.target !== sourceEl) {
       e.preventDefault();
-      copy();
+      copyAndDismiss();
     }
   }
 </script>

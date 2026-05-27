@@ -192,9 +192,12 @@ body {
   gap: var(--tl-sp-2);
 }
 
-/* Fill available space within a flex row/column. */
+/* Fill available space within a flex row/column. `min-height: 0` lets a grow
+ * item shrink below its content so an inner scroll area (e.g. .output) can
+ * actually scroll rather than expanding the panel. */
 .grow {
   flex: 1;
+  min-height: 0;
 }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
