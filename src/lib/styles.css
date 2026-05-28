@@ -21,30 +21,31 @@
   --tl-border: #e2e2e5;
   --tl-error: #c0392b;
 
-  /* Translucent "paint" (P2-012). ONE set of soft, irregular colour blobs shared
-     across the whole window — not per element. `background-attachment: fixed`
-     anchors them to the viewport, so every glass surface reveals the same
-     stationary pattern, and the fixed *px* sizes mean they keep their shape on
-     resize (no stretching). Emerald pools top-left, ultramarine top-right, blue
-     bottom-right; overlapping ellipses + soft falloff keep them organic (like
-     paint spilled in water), not perfect circles — the centre stays the frosted
-     grey base. `--tl-paint*` (image/position/size) are the shared colour; the
-     `*-bg` greys differ per surface so boxes/panes read darker + less see-through
-     than the panel's clear centre. Tune alphas, sizes, and positions here. */
+  /* Translucent "paint" (P2-012). ONE set of big, soft, irregular colour blobs
+     shared across the whole window (not per element). `background-attachment:
+     fixed` + absolute `left/top` positions anchor them to the window's top-left
+     origin, so resizing never moves or stretches them — they stay put and the
+     extra space just reveals more. They're scattered across the window (not only
+     the corners); overlapping ellipses + soft falloff keep them organic, like
+     paint spilled in water. `--tl-paint*` (image/position/size) are the shared
+     colour; the `*-bg` greys differ per surface (lower alpha = more transparent).
+     Tune alphas, sizes, and positions here. */
   --tl-paint:
     radial-gradient(ellipse, rgba(16,185,129,.18) 0%, transparent 70%),
+    radial-gradient(ellipse, rgba(45,125,246,.18) 0%, transparent 70%),
+    radial-gradient(ellipse, rgba(67,86,196,.17) 0%, transparent 72%),
     radial-gradient(ellipse, rgba(16,185,129,.16) 0%, transparent 72%),
-    radial-gradient(ellipse, rgba(67,86,196,.17) 0%, transparent 70%),
-    radial-gradient(ellipse, rgba(45,125,246,.18) 0%, transparent 72%),
-    radial-gradient(ellipse, rgba(45,125,246,.15) 0%, transparent 68%);
+    radial-gradient(ellipse, rgba(45,125,246,.18) 0%, transparent 70%),
+    radial-gradient(ellipse, rgba(67,86,196,.16) 0%, transparent 72%);
   --tl-paint-pos:
-    left -30px top -20px, left 70px top -45px, right -35px top -30px,
-    right -45px bottom -40px, right 55px bottom -35px;
-  --tl-paint-size: 190px 160px, 120px 95px, 175px 150px, 205px 175px, 130px 140px;
-  --tl-glass-bg: rgba(232,235,240,.50);
-  --tl-glass-strong-bg: rgba(230,233,239,.84);
+    left -40px top -30px, left 220px top -50px, left -60px top 120px,
+    left 120px top 140px, left 260px top 190px, left -30px top 240px;
+  --tl-paint-size:
+    260px 220px, 300px 240px, 240px 260px, 280px 240px, 320px 260px, 220px 220px;
+  --tl-glass-bg: rgba(232,235,240,.34);
+  --tl-glass-strong-bg: rgba(230,233,239,.64);
   --tl-glass-border: rgba(120,140,175,.32);
-  --tl-scrim: rgba(20,30,55,.28);
+  --tl-scrim: rgba(20,30,55,.34);
 
   /* Spacing scale (4px base) and radii — keeps the layout consistent. */
   --tl-sp-1: 4px;
@@ -91,14 +92,15 @@
     /* Same hues, dark and deep, over a dark grey (positions/sizes inherited). */
     --tl-paint:
       radial-gradient(ellipse, rgba(16,185,129,.24) 0%, transparent 70%),
+      radial-gradient(ellipse, rgba(45,125,246,.24) 0%, transparent 70%),
+      radial-gradient(ellipse, rgba(67,86,196,.22) 0%, transparent 72%),
       radial-gradient(ellipse, rgba(16,185,129,.20) 0%, transparent 72%),
-      radial-gradient(ellipse, rgba(67,86,196,.22) 0%, transparent 70%),
-      radial-gradient(ellipse, rgba(45,125,246,.24) 0%, transparent 72%),
-      radial-gradient(ellipse, rgba(45,125,246,.20) 0%, transparent 68%);
-    --tl-glass-bg: rgba(28,30,35,.58);
-    --tl-glass-strong-bg: rgba(20,22,26,.88);
+      radial-gradient(ellipse, rgba(45,125,246,.24) 0%, transparent 70%),
+      radial-gradient(ellipse, rgba(67,86,196,.20) 0%, transparent 72%);
+    --tl-glass-bg: rgba(28,30,35,.40);
+    --tl-glass-strong-bg: rgba(20,22,26,.66);
     --tl-glass-border: rgba(150,170,210,.20);
-    --tl-scrim: rgba(0,0,0,.50);
+    --tl-scrim: rgba(0,0,0,.56);
   }
 }
 
