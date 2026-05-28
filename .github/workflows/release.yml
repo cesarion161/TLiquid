@@ -119,3 +119,22 @@ jobs:
           releaseName: 'TLiquid ${{ github.ref_name }}'
           releaseDraft: true
           prerelease: false
+
+      # The landing page (tliquid-webpage) wires its "Download for macOS" CTA to
+      # https://github.com/<owner>/TLiquid/releases/latest/download/TLiquid.dmg
+      # — a URL GitHub only resolves if an asset with that exact stable filename
+      # exists on the latest release. The bundler emits a versioned name
+      # (TLiquid_<ver>_aarch64.dmg), so we add a duplicate with the stable name.
+      # Tagged-push only — manual workflow_dispatch has no tag and would 404.
+      - name: Upload stable-named DMG (TLiquid.dmg)
+        if: ${{ github.ref_type == 'tag' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DMG=$(ls src-tauri/target/release/bundle/dmg/TLiquid_*_aarch64.dmg | head -1)
+          if [ -z "$DMG" ]; then
+            echo "error: no built DMG found under src-tauri/target/release/bundle/dmg/" >&2
+            exit 1
+          fi
+          cp "$DMG" TLiquid.dmg
+          gh release upload "${{ github.ref_name }}" TLiquid.dmg --clobber
