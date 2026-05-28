@@ -21,19 +21,28 @@
   --tl-border: #e2e2e5;
   --tl-error: #c0392b;
 
-  /* Translucent "glass" (P2-012). Only in `.translucent` mode, over the macOS
-     vibrancy. The colour sits in the CORNERS as soft blurred blobs (emerald
-     top-left, ultramarine top-right, blue bottom-right) that fade out before the
-     middle, so the centre stays neutral grey — like light leaking colour into the
-     corners. `--tl-corners` is the colour layer (used alone on the panel);
-     `--tl-glass*` lay it over a frosted grey base for the boxes/panes (higher base
-     alpha = less see-through). Tune the corner alphas / grey bases here. */
-  --tl-corners:
-    radial-gradient(70% 60% at 0% 0%, rgba(16,185,129,.20), transparent 60%),
-    radial-gradient(50% 50% at 100% 0%, rgba(67,86,196,.18), transparent 55%),
-    radial-gradient(80% 70% at 100% 100%, rgba(45,125,246,.20), transparent 65%);
-  --tl-glass: var(--tl-corners), rgba(232,235,240,.50);
-  --tl-glass-strong: var(--tl-corners), rgba(230,233,239,.84);
+  /* Translucent "paint" (P2-012). ONE set of soft, irregular colour blobs shared
+     across the whole window — not per element. `background-attachment: fixed`
+     anchors them to the viewport, so every glass surface reveals the same
+     stationary pattern, and the fixed *px* sizes mean they keep their shape on
+     resize (no stretching). Emerald pools top-left, ultramarine top-right, blue
+     bottom-right; overlapping ellipses + soft falloff keep them organic (like
+     paint spilled in water), not perfect circles — the centre stays the frosted
+     grey base. `--tl-paint*` (image/position/size) are the shared colour; the
+     `*-bg` greys differ per surface so boxes/panes read darker + less see-through
+     than the panel's clear centre. Tune alphas, sizes, and positions here. */
+  --tl-paint:
+    radial-gradient(ellipse, rgba(16,185,129,.18) 0%, transparent 70%),
+    radial-gradient(ellipse, rgba(16,185,129,.16) 0%, transparent 72%),
+    radial-gradient(ellipse, rgba(67,86,196,.17) 0%, transparent 70%),
+    radial-gradient(ellipse, rgba(45,125,246,.18) 0%, transparent 72%),
+    radial-gradient(ellipse, rgba(45,125,246,.15) 0%, transparent 68%);
+  --tl-paint-pos:
+    left -30px top -20px, left 70px top -45px, right -35px top -30px,
+    right -45px bottom -40px, right 55px bottom -35px;
+  --tl-paint-size: 190px 160px, 120px 95px, 175px 150px, 205px 175px, 130px 140px;
+  --tl-glass-bg: rgba(232,235,240,.50);
+  --tl-glass-strong-bg: rgba(230,233,239,.84);
   --tl-glass-border: rgba(120,140,175,.32);
   --tl-scrim: rgba(20,30,55,.28);
 
@@ -79,13 +88,15 @@
     --tl-border: #3a3a3c;
     --tl-error: #ff6b5e;
 
-    /* Same hues, dark and deep — soft colour only in the corners over a dark grey. */
-    --tl-corners:
-      radial-gradient(70% 60% at 0% 0%, rgba(16,185,129,.24), transparent 60%),
-      radial-gradient(50% 50% at 100% 0%, rgba(67,86,196,.22), transparent 55%),
-      radial-gradient(80% 70% at 100% 100%, rgba(45,125,246,.26), transparent 65%);
-    --tl-glass: var(--tl-corners), rgba(28,30,35,.58);
-    --tl-glass-strong: var(--tl-corners), rgba(20,22,26,.88);
+    /* Same hues, dark and deep, over a dark grey (positions/sizes inherited). */
+    --tl-paint:
+      radial-gradient(ellipse, rgba(16,185,129,.24) 0%, transparent 70%),
+      radial-gradient(ellipse, rgba(16,185,129,.20) 0%, transparent 72%),
+      radial-gradient(ellipse, rgba(67,86,196,.22) 0%, transparent 70%),
+      radial-gradient(ellipse, rgba(45,125,246,.24) 0%, transparent 72%),
+      radial-gradient(ellipse, rgba(45,125,246,.20) 0%, transparent 68%);
+    --tl-glass-bg: rgba(28,30,35,.58);
+    --tl-glass-strong-bg: rgba(20,22,26,.88);
     --tl-glass-border: rgba(150,170,210,.20);
     --tl-scrim: rgba(0,0,0,.50);
   }
@@ -133,30 +144,43 @@ body {
   background: var(--tl-bg);
 }
 
-/* Translucent mode: the panel shows the vibrancy with soft colour pooled in the
-   corners (grey/clear centre); the titlebar stays clear glass. */
+/* Translucent mode: the SHARED window "paint" sits over the vibrancy and is
+   revealed by every glass surface through `background-attachment: fixed` — so the
+   blobs are one window-wide set (not per element) and keep their shape on resize.
+   The titlebar stays clear glass. */
+body.translucent .panel,
+body.translucent .input,
+body.translucent .select,
+body.translucent .textarea,
+body.translucent .output,
+body.translucent .overlay,
+body.translucent .output-actions {
+  background-image: var(--tl-paint);
+  background-position: var(--tl-paint-pos);
+  background-size: var(--tl-paint-size);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* Per-surface grey base under the shared paint: the panel's centre is clear
+   (vibrancy); boxes/panes get a frosted grey so they read darker + less
+   see-through, panes most (they sit over the translate view). */
 body.translucent .panel {
-  background: var(--tl-corners);
+  background-color: transparent;
 }
 body.translucent .titlebar {
   background: transparent;
 }
-
-/* Raised glass (P2-012): the input/output boxes and the overlay panes lay the
-   same corner colour over a frosted grey base, so they read darker, less
-   see-through, and grey-dominant in the centre. The boxes float over the
-   vibrancy; the panes sit over the translate view, so they use the more opaque
-   `--tl-glass-strong` to keep the content behind them from bleeding through. */
 body.translucent .input,
 body.translucent .select,
 body.translucent .textarea,
 body.translucent .output {
-  background: var(--tl-glass);
+  background-color: var(--tl-glass-bg);
   border-color: var(--tl-glass-border);
 }
 body.translucent .overlay,
 body.translucent .output-actions {
-  background: var(--tl-glass-strong);
+  background-color: var(--tl-glass-strong-bg);
 }
 body.translucent .overlay {
   border-left-color: var(--tl-glass-border);
