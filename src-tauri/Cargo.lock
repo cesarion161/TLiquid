@@ -4846,6 +4846,7 @@ dependencies = [
  "futures-util",
  "keyring",
  "log",
+ "objc2",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
@@ -4861,7 +4862,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
- "window-vibrancy",
 ]
 
 [[package]]

@@ -65,9 +65,11 @@ tauri-plugin-updater = "2"
 # the dependency platform-gated avoids pulling input libs on other targets.
 [target.'cfg(target_os = "macos")'.dependencies]
 enigo = "0.6"
-# macOS translucency/vibrancy behind the panel (P2-012). Applies an
-# NSVisualEffectView; already in the dependency tree, so this adds no weight.
-window-vibrancy = "0.6"
+# Tunable window backdrop blur (P2-012): we call the private CoreGraphics API
+# `CGSSetWindowBackgroundBlurRadius` (same mechanism Warp / iTerm2 / Alacritty use
+# for adjustable blur — `NSVisualEffectView` has fixed materials). objc2 is here
+# for the NSWindow `windowNumber` selector; the CGS symbols are linked directly.
+objc2 = "0.6"
 
 [profile.release]
 # Optimize for a small always-running utility (PRD §13.1 footprint targets).

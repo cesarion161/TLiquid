@@ -147,6 +147,10 @@ pub fn show_panel(app: &AppHandle) -> tauri::Result<()> {
         let _ = position_under_tray(&window);
     }
     window.show()?;
+    // (Re-)apply the backdrop blur: the NSWindow's `windowNumber` is `0` until
+    // first show, so the create-time call is a no-op. Calling on every show is
+    // cheap and idempotent, and it also picks up a toggle made via `set_translucency`.
+    apply_translucency(&window, crate::config::load(app).ui.translucent);
     window.set_focus()?;
     Ok(())
 }
@@ -201,35 +205,57 @@ fn save_geometry(window: &WebviewWindow) {
     }
 }
 
-/// Apply/clear the macOS vibrancy (frosted glass) behind the panel (P2-012). The
-/// window is created `transparent`; with vibrancy off the opaque CSS background
-/// fills it (solid look). Vibrancy is genuine frosted glass — it *does* show a
-/// blurred version of what's behind — but the blur amount is fixed (heavy) and
-/// can't be turned down, and the CSS must stay nearly tint-free or it goes opaque
-/// (kept light in `styles.css`). We use `HudWindow`, the glassiest material, so
-/// the most shows through; it's dark-biased (best in dark mode). macOS renders it
-/// opaque automatically under Reduce Transparency (a11y). No-op off macOS.
+/// Apply or clear the macOS window-level backdrop blur (P2-012). Uses the private
+/// CoreGraphics API `CGSSetWindowBackgroundBlurRadius` — the same mechanism Warp,
+/// iTerm2 and Alacritty use for an **adjustable** backdrop blur, since
+/// `NSVisualEffectView`'s materials have a fixed blur. Combined with the panel's
+/// translucent CSS background (alpha = "window opacity"), this is the
+/// frosted-glass-with-tunable-radius look. The private API is well-known and
+/// stable, but rules TLiquid out of the App Store (we're direct-distribution).
+/// `radius = 0` turns it off. No-op off macOS.
 pub fn apply_translucency(window: &WebviewWindow, enabled: bool) {
     #[cfg(target_os = "macos")]
     {
-        use window_vibrancy::{
-            apply_vibrancy, clear_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
-        };
-        if enabled {
-            if let Err(e) = apply_vibrancy(
-                window,
-                NSVisualEffectMaterial::HudWindow,
-                Some(NSVisualEffectState::Active),
-                None,
-            ) {
-                log::warn!("could not apply window vibrancy: {e}");
-            }
-        } else if let Err(e) = clear_vibrancy(window) {
-            log::warn!("could not clear window vibrancy: {e}");
-        }
+        let radius = if enabled { PANEL_BLUR_RADIUS } else { 0 };
+        set_window_background_blur(window, radius);
     }
     #[cfg(not(target_os = "macos"))]
     let _ = (window, enabled);
+}
+
+/// Default blur radius for the panel backdrop (P2-012). ~30 reads as a frosted
+/// glass; raise for more frost, lower for crisper see-through. Easy to expose as
+/// a user setting (Warp-style slider) later.
+#[cfg(target_os = "macos")]
+const PANEL_BLUR_RADIUS: i32 = 30;
+
+/// Set the window's backdrop blur radius via the private CGS API. The window's
+/// `windowNumber` is `0` until it's been ordered in (first `show`), so this is
+/// a no-op on a hidden window — `show_panel` re-calls `apply_translucency` after
+/// the first show so the blur takes effect then.
+#[cfg(target_os = "macos")]
+fn set_window_background_blur(window: &WebviewWindow, radius: i32) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGSMainConnectionID() -> i32;
+        fn CGSSetWindowBackgroundBlurRadius(connection: i32, window_id: i32, radius: i32) -> i32;
+    }
+
+    let Ok(ptr) = window.ns_window() else { return };
+    if ptr.is_null() {
+        return;
+    }
+    let ns_window = ptr as *mut AnyObject;
+    unsafe {
+        let window_number: isize = msg_send![ns_window, windowNumber];
+        if window_number <= 0 {
+            return;
+        }
+        let conn = CGSMainConnectionID();
+        let _ = CGSSetWindowBackgroundBlurRadius(conn, window_number as i32, radius);
+    }
 }
 
 /// Apply the translucency preference to the panel window by label (P2-012), used

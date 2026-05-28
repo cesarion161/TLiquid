@@ -41,12 +41,14 @@
     12% 16%, 80% 12%, 32% 50%, 88% 62%, 16% 84%, 62% 88%;
   --tl-paint-size:
     52vmin 44vmin, 46vmin 54vmin, 58vmin 48vmin, 44vmin 50vmin, 54vmin 46vmin, 48vmin 56vmin;
-  /* Tints over the macOS vibrancy (frosted glass). Kept very LIGHT so the frost
-     shows through — the vibrancy provides the backing/legibility; these just give
-     the boxes/panes a little definition. Raise a surface's alpha to make it more
-     solid, lower it to let more frost/colour-behind show. */
-  --tl-glass-bg: rgba(245,247,250,.16);
-  --tl-glass-strong-bg: rgba(245,247,250,.50);
+  /* Tints over the macOS window-level backdrop blur (windows.rs uses the private
+     `CGSSetWindowBackgroundBlurRadius`). `--tl-panel-bg`'s alpha is the panel's
+     "window opacity" (lower = more see-through; the blurred backdrop shows
+     through it). Box/pane tints stay light — they just give those surfaces a
+     little definition over the blurred panel. */
+  --tl-panel-bg: rgba(245,247,250,.55);
+  --tl-glass-bg: rgba(245,247,250,.18);
+  --tl-glass-strong-bg: rgba(245,247,250,.55);
   --tl-glass-border: rgba(120,140,175,.30);
   --tl-scrim: rgba(20,30,55,.36);
 
@@ -100,8 +102,9 @@
       radial-gradient(ellipse, rgba(12,150,108,.14) 0%, transparent 72%),
       radial-gradient(ellipse, rgba(40,110,225,.16) 0%, transparent 70%),
       radial-gradient(ellipse, rgba(60,80,190,.14) 0%, transparent 72%);
-    --tl-glass-bg: rgba(20,22,28,.12);
-    --tl-glass-strong-bg: rgba(16,18,24,.48);
+    --tl-panel-bg: rgba(20,22,28,.55);
+    --tl-glass-bg: rgba(20,22,28,.16);
+    --tl-glass-strong-bg: rgba(16,18,24,.55);
     --tl-glass-border: rgba(150,170,210,.18);
     --tl-scrim: rgba(0,0,0,.58);
   }
@@ -171,8 +174,9 @@ body.translucent .output-actions {
    (vibrancy); boxes/panes get a frosted grey so they read darker + less
    see-through, panes most (they sit over the translate view). */
 body.translucent .panel {
-  /* Transparent so the macOS vibrancy (frosted glass) shows through. */
-  background-color: transparent;
+  /* `--tl-panel-bg` alpha = "window opacity"; the window-level CGS blur (set in
+     windows.rs) blurs whatever's behind, so this tint reads as frosted glass. */
+  background-color: var(--tl-panel-bg);
 }
 body.translucent .titlebar {
   background: transparent;
