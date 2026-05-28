@@ -211,6 +211,27 @@ The app's updater endpoint is
 > reachable — and clients see no update — until you **publish** the draft. Review
 > the artifacts, then publish.
 
+### 6.3 Cutting a release (the one command)
+
+`scripts/release.sh <version>` does the repetitive part: it bumps the version in
+the three manifests + `Cargo.lock`, verifies the edits, then (after a `[y/N]`
+confirmation) commits, tags `vX.Y.Z`, and pushes — which triggers `release.yml`.
+
+```bash
+scripts/release.sh 0.1.2
+```
+
+It refuses to run unless the tree is clean, you're on `main`, and the tag is new.
+The **version must be a higher semver** than what users have, or their app reports
+*Up to date*. After it pushes, watch the build, then **publish the draft** (§6.2):
+
+```bash
+gh release edit v0.1.2 --draft=false --latest
+```
+
+That's the whole release flow; the one-time setup (signing secret, read-write
+Actions permissions) is already in place.
+
 ## 7. Status
 
 - **Implemented:** Hardened-Runtime + entitlements config, env-driven signing &
