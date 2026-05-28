@@ -27,10 +27,9 @@
      across — and scale with — the window at any size (constant aspect, so they
      don't stretch/distort, and they're never clustered in one corner). Scattered,
      overlapping ellipses + soft falloff make them organic, like paint in water.
-     Translucency itself is plain window transparency (no vibrancy/blur), so the
-     panel shows through to whatever is behind it. `--tl-paint*` are the shared
-     colour; the `*-bg` greys differ per surface (lower alpha = more see-through).
-     Tune alphas (colour intensity), sizes, and positions here. */
+     These blobs layer over the macOS vibrancy (frosted glass) behind the panel.
+     `--tl-paint*` are the shared colour; the `*-bg` tints below stay light so the
+     frost shows through. Tune alphas (colour intensity), sizes, positions here. */
   --tl-paint:
     radial-gradient(ellipse, rgba(10,140,100,.13) 0%, transparent 70%),
     radial-gradient(ellipse, rgba(35,100,210,.13) 0%, transparent 70%),
@@ -42,17 +41,14 @@
     12% 16%, 80% 12%, 32% 50%, 88% 62%, 16% 84%, 62% 88%;
   --tl-paint-size:
     52vmin 44vmin, 46vmin 54vmin, 58vmin 48vmin, 44vmin 50vmin, 54vmin 46vmin, 48vmin 56vmin;
-  /* Tints over the see-through window — this is THE dial between "see what's
-     behind" and "readable text" (no vibrancy: vibrancy hides what's behind
-     entirely). Moderate alphas give a *dimmed* see-through that's still legible:
-     raise for more legibility / less see-through, lower for more see-through.
-     `--tl-panel-bg` backs the titlebar + on-panel labels; boxes (typed/output
-     text) and panes (over the translate view) are progressively more opaque. */
-  --tl-panel-bg: rgba(244,246,250,.40);
-  --tl-glass-bg: rgba(245,247,250,.50);
-  --tl-glass-strong-bg: rgba(245,247,250,.74);
-  --tl-glass-border: rgba(120,140,175,.34);
-  --tl-scrim: rgba(20,30,55,.40);
+  /* Tints over the macOS vibrancy (frosted glass). Kept very LIGHT so the frost
+     shows through — the vibrancy provides the backing/legibility; these just give
+     the boxes/panes a little definition. Raise a surface's alpha to make it more
+     solid, lower it to let more frost/colour-behind show. */
+  --tl-glass-bg: rgba(245,247,250,.16);
+  --tl-glass-strong-bg: rgba(245,247,250,.50);
+  --tl-glass-border: rgba(120,140,175,.30);
+  --tl-scrim: rgba(20,30,55,.36);
 
   /* Spacing scale (4px base) and radii — keeps the layout consistent. */
   --tl-sp-1: 4px;
@@ -104,11 +100,10 @@
       radial-gradient(ellipse, rgba(12,150,108,.14) 0%, transparent 72%),
       radial-gradient(ellipse, rgba(40,110,225,.16) 0%, transparent 70%),
       radial-gradient(ellipse, rgba(60,80,190,.14) 0%, transparent 72%);
-    --tl-panel-bg: rgba(16,18,24,.42);
-    --tl-glass-bg: rgba(20,22,28,.52);
-    --tl-glass-strong-bg: rgba(16,18,24,.74);
-    --tl-glass-border: rgba(150,170,210,.20);
-    --tl-scrim: rgba(0,0,0,.62);
+    --tl-glass-bg: rgba(20,22,28,.12);
+    --tl-glass-strong-bg: rgba(16,18,24,.48);
+    --tl-glass-border: rgba(150,170,210,.18);
+    --tl-scrim: rgba(0,0,0,.58);
   }
 }
 
@@ -176,9 +171,8 @@ body.translucent .output-actions {
    (vibrancy); boxes/panes get a frosted grey so they read darker + less
    see-through, panes most (they sit over the translate view). */
 body.translucent .panel {
-  /* A dimmed tint over the see-through window: you still see (faintly) what's
-     behind, while it backs the titlebar + on-panel text. */
-  background-color: var(--tl-panel-bg);
+  /* Transparent so the macOS vibrancy (frosted glass) shows through. */
+  background-color: transparent;
 }
 body.translucent .titlebar {
   background: transparent;
