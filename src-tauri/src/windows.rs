@@ -201,20 +201,39 @@ fn save_geometry(window: &WebviewWindow) {
     }
 }
 
-/// Ensure the panel has no macOS vibrancy material (P2-012). Translucency is now
-/// **plain window transparency** (the window is created `transparent`), driven by
-/// the `body.translucent` CSS class — deliberately NOT an `NSVisualEffectView`.
-/// Vibrancy *frosts/blurs* whatever is behind the window; plain transparency lets
-/// the panel show through to the window underneath (you can almost read text
-/// behind it), which is the intended look. So we just clear any vibrancy that may
-/// have been attached. `_enabled` is kept for call-site symmetry. No-op off macOS.
-pub fn apply_translucency(window: &WebviewWindow, _enabled: bool) {
+/// Apply or clear the macOS vibrancy material behind the panel (P2-012). The
+/// window is created transparent; with vibrancy off the opaque CSS background
+/// fills it (solid look). We use a translucent, appearance-adaptive material so
+/// the panel is a *light* frosted glass that lets colour/brightness behind bleed
+/// through (a blurred hint of what's behind, with readable text) — a real,
+/// persistent blur, unlike CSS `backdrop-filter`, which only samples a backdrop
+/// transiently while a transparent window repaints (hence the resize-only blur).
+/// macOS renders the material opaque automatically under Reduce Transparency
+/// (a11y). No-op off macOS.
+pub fn apply_translucency(window: &WebviewWindow, enabled: bool) {
     #[cfg(target_os = "macos")]
     {
-        let _ = window_vibrancy::clear_vibrancy(window);
+        use window_vibrancy::{
+            apply_vibrancy, clear_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
+        };
+        if enabled {
+            // `UnderWindowBackground` is translucent and adapts to light/dark, so
+            // more of what's behind shows through than a heavier material (e.g.
+            // `Sidebar`). `Active` keeps it lit (we hide on blur anyway).
+            if let Err(e) = apply_vibrancy(
+                window,
+                NSVisualEffectMaterial::UnderWindowBackground,
+                Some(NSVisualEffectState::Active),
+                None,
+            ) {
+                log::warn!("could not apply window vibrancy: {e}");
+            }
+        } else if let Err(e) = clear_vibrancy(window) {
+            log::warn!("could not clear window vibrancy: {e}");
+        }
     }
     #[cfg(not(target_os = "macos"))]
-    let _ = window;
+    let _ = (window, enabled);
 }
 
 /// Apply the translucency preference to the panel window by label (P2-012), used
