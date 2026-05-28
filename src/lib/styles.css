@@ -21,15 +21,20 @@
   --tl-border: #e2e2e5;
   --tl-error: #c0392b;
 
-  /* Translucent "glass" tint (P2-012). Used only in `.translucent` mode, layered
-     over the macOS vibrancy: an emerald → ultramarine → blue wash. Higher alpha =
-     less see-through. `--tl-tint` is the panel's faint wash; `--tl-glass*` add a
-     frosted base so the input/output boxes and the overlay panes read a touch
-     darker and less see-through than the panel. Tune the alphas here. */
-  --tl-tint: linear-gradient(135deg, rgba(16,185,129,.10), rgba(67,86,196,.10) 52%, rgba(45,125,246,.12));
-  --tl-glass: linear-gradient(135deg, rgba(16,185,129,.14), rgba(67,86,196,.16) 52%, rgba(45,125,246,.18)), rgba(232,237,244,.48);
-  --tl-glass-strong: linear-gradient(135deg, rgba(16,185,129,.14), rgba(67,86,196,.16) 52%, rgba(45,125,246,.18)), rgba(230,235,242,.82);
-  --tl-glass-border: rgba(120,140,175,.35);
+  /* Translucent "glass" (P2-012). Only in `.translucent` mode, over the macOS
+     vibrancy. The colour sits in the CORNERS as soft blurred blobs (emerald
+     top-left, ultramarine top-right, blue bottom-right) that fade out before the
+     middle, so the centre stays neutral grey — like light leaking colour into the
+     corners. `--tl-corners` is the colour layer (used alone on the panel);
+     `--tl-glass*` lay it over a frosted grey base for the boxes/panes (higher base
+     alpha = less see-through). Tune the corner alphas / grey bases here. */
+  --tl-corners:
+    radial-gradient(70% 60% at 0% 0%, rgba(16,185,129,.20), transparent 60%),
+    radial-gradient(50% 50% at 100% 0%, rgba(67,86,196,.18), transparent 55%),
+    radial-gradient(80% 70% at 100% 100%, rgba(45,125,246,.20), transparent 65%);
+  --tl-glass: var(--tl-corners), rgba(232,235,240,.50);
+  --tl-glass-strong: var(--tl-corners), rgba(230,233,239,.84);
+  --tl-glass-border: rgba(120,140,175,.32);
   --tl-scrim: rgba(20,30,55,.28);
 
   /* Spacing scale (4px base) and radii — keeps the layout consistent. */
@@ -74,12 +79,15 @@
     --tl-border: #3a3a3c;
     --tl-error: #ff6b5e;
 
-    /* Same hues, dark and deep (P2-012 translucency tint). */
-    --tl-tint: linear-gradient(135deg, rgba(6,95,70,.32), rgba(28,40,120,.32) 52%, rgba(20,60,140,.36));
-    --tl-glass: linear-gradient(135deg, rgba(8,110,82,.30), rgba(34,46,130,.32) 52%, rgba(26,70,150,.36)), rgba(16,20,28,.50);
-    --tl-glass-strong: linear-gradient(135deg, rgba(8,110,82,.30), rgba(34,46,130,.32) 52%, rgba(26,70,150,.36)), rgba(14,17,24,.84);
-    --tl-glass-border: rgba(150,170,210,.22);
-    --tl-scrim: rgba(0,0,0,.46);
+    /* Same hues, dark and deep — soft colour only in the corners over a dark grey. */
+    --tl-corners:
+      radial-gradient(70% 60% at 0% 0%, rgba(16,185,129,.24), transparent 60%),
+      radial-gradient(50% 50% at 100% 0%, rgba(67,86,196,.22), transparent 55%),
+      radial-gradient(80% 70% at 100% 100%, rgba(45,125,246,.26), transparent 65%);
+    --tl-glass: var(--tl-corners), rgba(28,30,35,.58);
+    --tl-glass-strong: var(--tl-corners), rgba(20,22,26,.88);
+    --tl-glass-border: rgba(150,170,210,.20);
+    --tl-scrim: rgba(0,0,0,.50);
   }
 }
 
@@ -125,20 +133,20 @@ body {
   background: var(--tl-bg);
 }
 
-/* Translucent mode: the panel gets a faint colored frost wash over the vibrancy;
-   the titlebar stays clear glass. */
+/* Translucent mode: the panel shows the vibrancy with soft colour pooled in the
+   corners (grey/clear centre); the titlebar stays clear glass. */
 body.translucent .panel {
-  background: var(--tl-tint);
+  background: var(--tl-corners);
 }
 body.translucent .titlebar {
   background: transparent;
 }
 
-/* Raised glass (P2-012): the input/output boxes and the overlay panes use the
-   same vibrancy as the panel, tinted stronger with a frosted base so they read
-   darker and less see-through. The boxes float over the vibrancy; the panes sit
-   over the translate view, so they use the more opaque `--tl-glass-strong` to
-   keep the content behind them from bleeding through. */
+/* Raised glass (P2-012): the input/output boxes and the overlay panes lay the
+   same corner colour over a frosted grey base, so they read darker, less
+   see-through, and grey-dominant in the centre. The boxes float over the
+   vibrancy; the panes sit over the translate view, so they use the more opaque
+   `--tl-glass-strong` to keep the content behind them from bleeding through. */
 body.translucent .input,
 body.translucent .select,
 body.translucent .textarea,
