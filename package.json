@@ -1,6 +1,6 @@
 {
   "name": "tliquid",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "TLiquid — a tiny, open-source, macOS-first BYOK LLM translator that lives in your menu bar.",
   "license": "MIT",
   "type": "module",
