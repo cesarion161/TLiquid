@@ -21,6 +21,17 @@
   --tl-border: #e2e2e5;
   --tl-error: #c0392b;
 
+  /* Translucent "glass" tint (P2-012). Used only in `.translucent` mode, layered
+     over the macOS vibrancy: an emerald → ultramarine → blue wash. Higher alpha =
+     less see-through. `--tl-tint` is the panel's faint wash; `--tl-glass*` add a
+     frosted base so the input/output boxes and the overlay panes read a touch
+     darker and less see-through than the panel. Tune the alphas here. */
+  --tl-tint: linear-gradient(135deg, rgba(16,185,129,.10), rgba(67,86,196,.10) 52%, rgba(45,125,246,.12));
+  --tl-glass: linear-gradient(135deg, rgba(16,185,129,.14), rgba(67,86,196,.16) 52%, rgba(45,125,246,.18)), rgba(232,237,244,.48);
+  --tl-glass-strong: linear-gradient(135deg, rgba(16,185,129,.14), rgba(67,86,196,.16) 52%, rgba(45,125,246,.18)), rgba(230,235,242,.82);
+  --tl-glass-border: rgba(120,140,175,.35);
+  --tl-scrim: rgba(20,30,55,.28);
+
   /* Spacing scale (4px base) and radii — keeps the layout consistent. */
   --tl-sp-1: 4px;
   --tl-sp-2: 8px;
@@ -62,6 +73,13 @@
     --tl-text-muted: #9a9aa0;
     --tl-border: #3a3a3c;
     --tl-error: #ff6b5e;
+
+    /* Same hues, dark and deep (P2-012 translucency tint). */
+    --tl-tint: linear-gradient(135deg, rgba(6,95,70,.32), rgba(28,40,120,.32) 52%, rgba(20,60,140,.36));
+    --tl-glass: linear-gradient(135deg, rgba(8,110,82,.30), rgba(34,46,130,.32) 52%, rgba(26,70,150,.36)), rgba(16,20,28,.50);
+    --tl-glass-strong: linear-gradient(135deg, rgba(8,110,82,.30), rgba(34,46,130,.32) 52%, rgba(26,70,150,.36)), rgba(14,17,24,.84);
+    --tl-glass-border: rgba(150,170,210,.22);
+    --tl-scrim: rgba(0,0,0,.46);
   }
 }
 
@@ -107,9 +125,36 @@ body {
   background: var(--tl-bg);
 }
 
-body.translucent .panel,
+/* Translucent mode: the panel gets a faint colored frost wash over the vibrancy;
+   the titlebar stays clear glass. */
+body.translucent .panel {
+  background: var(--tl-tint);
+}
 body.translucent .titlebar {
   background: transparent;
+}
+
+/* Raised glass (P2-012): the input/output boxes and the overlay panes use the
+   same vibrancy as the panel, tinted stronger with a frosted base so they read
+   darker and less see-through. The boxes float over the vibrancy; the panes sit
+   over the translate view, so they use the more opaque `--tl-glass-strong` to
+   keep the content behind them from bleeding through. */
+body.translucent .input,
+body.translucent .select,
+body.translucent .textarea,
+body.translucent .output {
+  background: var(--tl-glass);
+  border-color: var(--tl-glass-border);
+}
+body.translucent .overlay,
+body.translucent .output-actions {
+  background: var(--tl-glass-strong);
+}
+body.translucent .overlay {
+  border-left-color: var(--tl-glass-border);
+}
+body.translucent .scrim {
+  background: var(--tl-scrim);
 }
 
 /* Slim drag bar: product name + version on the left, bell/gear (or back) right. */
