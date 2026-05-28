@@ -15,7 +15,7 @@ is no telemetry.
 
 This repository is the **Phase 0 (macOS MVP)** foundation. See
 [`llm_translator_prd.md`](./llm_translator_prd.md) for the full product spec and
-[`tliquid_todo.md`](./tliquid_todo.md) for the epic tracker.
+[`ROADMAP.md`](./ROADMAP.md) for the direction.
 
 > **Scope note:** Phase 0 is macOS only. Windows and Linux are *not* verified
 > targets yet (the architecture is kept portable via Tauri, but only macOS
@@ -351,8 +351,8 @@ first-run consent (P1-001), and a richer **diagnostics bundle** with export
 (P1-007). Packaging supports signing + notarization (P1-008), but official signed
 builds need a paid Apple Developer account, so default builds remain unsigned. The
 automated gate is green (78 tests) and the full `.app` + `.dmg` build; remaining
-sign-off is the on-device checklist in [`QA.md`](./QA.md) and signing. Epic-by-epic
-status is tracked in [`tliquid_todo.md`](./tliquid_todo.md).
+sign-off is the on-device checklist in [`QA.md`](./QA.md) and signing. For where
+the product is going next, see [`ROADMAP.md`](./ROADMAP.md).
 
 ## License
 

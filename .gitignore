@@ -26,5 +26,9 @@ src-tauri/gen/
 # The matching PUBLIC key is embedded in tauri.conf.json (safe to publish).
 .tauri/
 
+# Internal docs (granular task tracker, working notes). Public roadmap lives in
+# ROADMAP.md; the PRD is public. This folder is for the operational sprint board.
+docs/internal/
+
 # Idea
 .idea

@@ -7,9 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 TLiquid is a macOS-first, BYOK (bring-your-own-key) LLM translator that lives in the
 menu bar. **Tauri v2** shell, **Rust** core (`src-tauri/`), **Svelte 5 + Vite + TypeScript**
 frontend (`src/`). Package manager is **pnpm**. Currently **Phase 0** (macOS-only MVP);
-Windows/Linux are not verified targets. The full spec is `llm_translator_prd.md`; work is
-tracked as `P0-xxx` tasks in `tliquid_todo.md`, and module/command doc-comments cite the
-task IDs they implement.
+Windows/Linux are not verified targets. The full spec is `llm_translator_prd.md` (public);
+the public-facing direction lives in `ROADMAP.md`. Granular task tracking lives in
+`docs/internal/todo.md` (gitignored — operational, never pushed); tasks are `P0-xxx`-style,
+and module/command doc-comments cite the task IDs they implement.
 
 ## Commands
 
