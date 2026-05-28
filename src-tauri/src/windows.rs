@@ -101,6 +101,11 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
     // Apply the saved translucency preference (P2-012). No-op off macOS.
     apply_translucency(&window, crate::config::load(app).ui.translucent);
 
+    // Round the window so the OS clips the backdrop blur + shadow to match the
+    // panel's CSS rounded corners (otherwise the blur/shadow stay square).
+    #[cfg(target_os = "macos")]
+    round_window_corners(&window, PANEL_CORNER_RADIUS);
+
     let panel = window.clone();
     window.on_window_event(move |event| match event {
         // A close gesture (e.g. Cmd+W) must dismiss the panel, not tear it down:
@@ -229,6 +234,11 @@ pub fn apply_translucency(window: &WebviewWindow, enabled: bool) {
 #[cfg(target_os = "macos")]
 const PANEL_BLUR_RADIUS: i32 = 30;
 
+/// Window corner radius. Kept in sync with the `.panel` CSS `border-radius` so
+/// the OS-level backdrop blur + shadow clip to the same rounded shape.
+#[cfg(target_os = "macos")]
+const PANEL_CORNER_RADIUS: f64 = 10.0;
+
 /// Set the window's backdrop blur radius via the private CGS API. The window's
 /// `windowNumber` is `0` until it's been ordered in (first `show`), so this is
 /// a no-op on a hidden window — `show_panel` re-calls `apply_translucency` after
@@ -255,6 +265,34 @@ fn set_window_background_blur(window: &WebviewWindow, radius: i32) {
         }
         let conn = CGSMainConnectionID();
         let _ = CGSSetWindowBackgroundBlurRadius(conn, window_number as i32, radius);
+    }
+}
+
+/// Round the NSWindow's content-view layer so the OS clips both the rendered
+/// content AND the window-server-level backdrop blur + shadow to that shape
+/// (otherwise they'd stay rectangular around the CSS-rounded panel).
+#[cfg(target_os = "macos")]
+fn round_window_corners(window: &WebviewWindow, radius: f64) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    let Ok(ptr) = window.ns_window() else { return };
+    if ptr.is_null() {
+        return;
+    }
+    let ns_window = ptr as *mut AnyObject;
+    unsafe {
+        let content_view: *mut AnyObject = msg_send![ns_window, contentView];
+        if content_view.is_null() {
+            return;
+        }
+        // Make sure the view is layer-backed (Tauri's already is, but be defensive).
+        let _: () = msg_send![content_view, setWantsLayer: true];
+        let layer: *mut AnyObject = msg_send![content_view, layer];
+        if layer.is_null() {
+            return;
+        }
+        let _: () = msg_send![layer, setCornerRadius: radius];
+        let _: () = msg_send![layer, setMasksToBounds: true];
     }
 }
 

@@ -338,7 +338,7 @@
       {/each}
     </select>
     <button
-      class="btn btn--primary"
+      class="btn btn--primary btn--translate"
       onclick={doTranslate}
       disabled={!ready || !sourceText.trim() || translating}
     >
