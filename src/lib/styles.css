@@ -22,30 +22,30 @@
   --tl-error: #c0392b;
 
   /* Translucent "paint" (P2-012). ONE set of big, soft, irregular colour blobs
-     shared across the whole window (not per element). `background-attachment:
-     fixed` + absolute `left/top` positions anchor them to the window's top-left
-     origin, so resizing never moves or stretches them — they stay put and the
-     extra space just reveals more. They're scattered across the window (not only
-     the corners); overlapping ellipses + soft falloff keep them organic, like
-     paint spilled in water. `--tl-paint*` (image/position/size) are the shared
-     colour; the `*-bg` greys differ per surface (lower alpha = more transparent).
-     Tune alphas, sizes, and positions here. */
+     shared across the whole window (not per element) via `background-attachment:
+     fixed`. Positions are PERCENTAGES and sizes are `vmin`, so the blobs spread
+     across — and scale with — the window at any size (constant aspect, so they
+     don't stretch/distort, and they're never clustered in one corner). Scattered,
+     overlapping ellipses + soft falloff make them organic, like paint in water.
+     Translucency itself is plain window transparency (no vibrancy/blur), so the
+     panel shows through to whatever is behind it. `--tl-paint*` are the shared
+     colour; the `*-bg` greys differ per surface (lower alpha = more see-through).
+     Tune alphas (colour intensity), sizes, and positions here. */
   --tl-paint:
-    radial-gradient(ellipse, rgba(16,185,129,.18) 0%, transparent 70%),
-    radial-gradient(ellipse, rgba(45,125,246,.18) 0%, transparent 70%),
-    radial-gradient(ellipse, rgba(67,86,196,.17) 0%, transparent 72%),
-    radial-gradient(ellipse, rgba(16,185,129,.16) 0%, transparent 72%),
-    radial-gradient(ellipse, rgba(45,125,246,.18) 0%, transparent 70%),
-    radial-gradient(ellipse, rgba(67,86,196,.16) 0%, transparent 72%);
+    radial-gradient(ellipse, rgba(10,140,100,.13) 0%, transparent 70%),
+    radial-gradient(ellipse, rgba(35,100,210,.13) 0%, transparent 70%),
+    radial-gradient(ellipse, rgba(55,70,170,.12) 0%, transparent 72%),
+    radial-gradient(ellipse, rgba(10,140,100,.11) 0%, transparent 72%),
+    radial-gradient(ellipse, rgba(35,100,210,.12) 0%, transparent 70%),
+    radial-gradient(ellipse, rgba(55,70,170,.11) 0%, transparent 72%);
   --tl-paint-pos:
-    left -40px top -30px, left 220px top -50px, left -60px top 120px,
-    left 120px top 140px, left 260px top 190px, left -30px top 240px;
+    12% 16%, 80% 12%, 32% 50%, 88% 62%, 16% 84%, 62% 88%;
   --tl-paint-size:
-    260px 220px, 300px 240px, 240px 260px, 280px 240px, 320px 260px, 220px 220px;
-  --tl-glass-bg: rgba(232,235,240,.34);
-  --tl-glass-strong-bg: rgba(230,233,239,.64);
-  --tl-glass-border: rgba(120,140,175,.32);
-  --tl-scrim: rgba(20,30,55,.34);
+    52vmin 44vmin, 46vmin 54vmin, 58vmin 48vmin, 44vmin 50vmin, 54vmin 46vmin, 48vmin 56vmin;
+  --tl-glass-bg: rgba(232,235,240,.18);
+  --tl-glass-strong-bg: rgba(230,233,239,.50);
+  --tl-glass-border: rgba(120,140,175,.30);
+  --tl-scrim: rgba(20,30,55,.40);
 
   /* Spacing scale (4px base) and radii — keeps the layout consistent. */
   --tl-sp-1: 4px;
@@ -91,16 +91,16 @@
 
     /* Same hues, dark and deep, over a dark grey (positions/sizes inherited). */
     --tl-paint:
-      radial-gradient(ellipse, rgba(16,185,129,.24) 0%, transparent 70%),
-      radial-gradient(ellipse, rgba(45,125,246,.24) 0%, transparent 70%),
-      radial-gradient(ellipse, rgba(67,86,196,.22) 0%, transparent 72%),
-      radial-gradient(ellipse, rgba(16,185,129,.20) 0%, transparent 72%),
-      radial-gradient(ellipse, rgba(45,125,246,.24) 0%, transparent 70%),
-      radial-gradient(ellipse, rgba(67,86,196,.20) 0%, transparent 72%);
-    --tl-glass-bg: rgba(28,30,35,.40);
-    --tl-glass-strong-bg: rgba(20,22,26,.66);
-    --tl-glass-border: rgba(150,170,210,.20);
-    --tl-scrim: rgba(0,0,0,.56);
+      radial-gradient(ellipse, rgba(12,150,108,.16) 0%, transparent 70%),
+      radial-gradient(ellipse, rgba(40,110,225,.16) 0%, transparent 70%),
+      radial-gradient(ellipse, rgba(60,80,190,.15) 0%, transparent 72%),
+      radial-gradient(ellipse, rgba(12,150,108,.14) 0%, transparent 72%),
+      radial-gradient(ellipse, rgba(40,110,225,.16) 0%, transparent 70%),
+      radial-gradient(ellipse, rgba(60,80,190,.14) 0%, transparent 72%);
+    --tl-glass-bg: rgba(28,30,35,.22);
+    --tl-glass-strong-bg: rgba(20,22,26,.52);
+    --tl-glass-border: rgba(150,170,210,.18);
+    --tl-scrim: rgba(0,0,0,.62);
   }
 }
 
@@ -189,6 +189,24 @@ body.translucent .overlay {
 }
 body.translucent .scrim {
   background: var(--tl-scrim);
+}
+
+/* Respect the OS "Reduce transparency" accessibility setting (Safari 17+): fall
+   back to solid, opaque surfaces so the see-through panel doesn't fight that
+   preference. (Vibrancy used to handle this automatically; now that translucency
+   is plain window transparency, we opt out in CSS where the media query exists.) */
+@media (prefers-reduced-transparency: reduce) {
+  body.translucent .panel {
+    background: var(--tl-bg);
+  }
+  body.translucent .input,
+  body.translucent .select,
+  body.translucent .textarea,
+  body.translucent .output,
+  body.translucent .overlay,
+  body.translucent .output-actions {
+    background: var(--tl-surface);
+  }
 }
 
 /* Slim drag bar: product name + version on the left, bell/gear (or back) right. */
