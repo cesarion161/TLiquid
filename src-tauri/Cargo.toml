@@ -1,6 +1,6 @@
 [package]
 name = "tliquid"
-version = "0.1.2"
+version = "0.2.0"
 description = "TLiquid — macOS-first BYOK LLM translator"
 authors = ["TLiquid contributors"]
 edition = "2021"
