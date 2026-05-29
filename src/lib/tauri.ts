@@ -49,11 +49,13 @@ export interface Settings {
   version: number;
   startup: { enabled: boolean; prompted: boolean };
   ui: {
-    theme: string;
+    theme: Theme;
     accentColor: string;
     openResultFrom: string;
     /** macOS translucency/vibrancy behind the panel (P2-012). */
     translucent: boolean;
+    /** Body/content text-size multiplier (0.8–1.4; 1.0 default). Pure CSS. */
+    fontScale: number;
   };
   languages: {
     primary: Language;
@@ -137,6 +139,13 @@ export const isLaunchAtLogin = (): Promise<boolean> =>
 /** Persist + apply the macOS panel translucency toggle (P2-012). */
 export const setTranslucency = (enabled: boolean): Promise<void> =>
   invoke("set_translucency", { enabled });
+
+/** Colour theme: follow the OS, or force light/dark. */
+export type Theme = "system" | "light" | "dark";
+
+/** Persist + apply the colour theme (drives `prefers-color-scheme`). */
+export const setTheme = (theme: Theme): Promise<void> =>
+  invoke("set_theme", { theme });
 
 export const setProviderKey = (provider: ProviderId, key: string): Promise<void> =>
   invoke("set_provider_key", { provider, key });

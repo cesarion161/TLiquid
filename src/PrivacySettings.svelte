@@ -46,7 +46,7 @@
 <div class="section">
   <h2 class="section__title">Privacy</h2>
   <p class="hint">
-    TLiquid sends your text only to the provider you choose, and your API keys
+    T·Liquid sends your text only to the provider you choose, and your API keys
     stay in the macOS Keychain. There is no telemetry and no diagnostics upload.
   </p>
   <p class="hint">

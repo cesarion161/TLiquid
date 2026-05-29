@@ -133,7 +133,7 @@
   {/if}
 
   <p class="hint">
-    When on, TLiquid checks GitHub for a newer version on startup and every few
+    When on, T·Liquid checks GitHub for a newer version on startup and every few
     hours — it only notifies you (via the 🔔 bell); you always click to install.
     Updates are signed and installed in place — no manual reinstall.
     <button class="linklike" onclick={() => openExternal(RELEASES_URL)}>
@@ -144,7 +144,7 @@
 
 <div class="section">
   <h2 class="section__title">About</h2>
-  <p class="hint">TLiquid v{version}</p>
+  <p class="hint">T·Liquid v{version}</p>
   <p class="hint">
     An open-source (MIT), macOS-first, bring-your-own-key LLM translator that
     lives in your menu bar.

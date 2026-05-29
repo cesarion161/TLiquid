@@ -26,9 +26,12 @@
      "window opacity" (lower = more see-through; the blurred backdrop shows
      through it). Box/pane tints stay light — they just give those surfaces a
      little definition over the blurred panel. */
-  --tl-panel-bg: rgba(245,247,250,.65);
-  --tl-glass-bg: rgba(255,255,255,.55);
-  --tl-glass-strong-bg: rgba(255,255,255,.80);
+  /* Light mode reads whiter + less see-through than a typical glass panel (a
+     deliberate choice for legibility; dark mode keeps its darker, more
+     translucent tints in the media query below). */
+  --tl-panel-bg: rgba(252,253,255,.88);
+  --tl-glass-bg: rgba(255,255,255,.78);
+  --tl-glass-strong-bg: rgba(255,255,255,.92);
   --tl-glass-border: rgba(120,140,175,.30);
   --tl-scrim: rgba(20,30,55,.36);
 
@@ -40,9 +43,16 @@
   --tl-radius: 8px;
   --tl-radius-sm: 6px;
 
-  /* Type scale. */
+  /* Type scale — fixed; the whole UI (chrome, labels, Settings) sizes off these. */
   --tl-fs-sm: 12px;
   --tl-fs-base: 14px;
+
+  /* User-set multiplier (Settings → Appearance, persisted as `ui.fontScale`;
+     App.svelte sets it on the root). It scales ONLY the translate view's input
+     and output text — not the surrounding UI — so resizing the reading text
+     doesn't reflow the rest of the panel (notably the Settings slider you're
+     dragging). Applied just on `.textarea` + `.output-body`. */
+  --tl-content-scale: 1;
 
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
     system-ui, sans-serif;
@@ -135,6 +145,12 @@ body.translucent .panel {
   /* `--tl-panel-bg` alpha = "window opacity"; the window-level CGS blur (set in
      windows.rs) blurs whatever's behind, so this tint reads as frosted glass. */
   background-color: var(--tl-panel-bg);
+  /* Square corners while translucent: the CGS blur fills the rectangular window
+     frame and can't be clipped to a rounded shape, so rounded corners would show
+     a blurred-desktop halo in the corners. A square panel matches the blur. The
+     native window shape is squared to match in windows.rs (`panel_corner_radius`).
+     Corners round again when translucency is off (the base `.panel` rule). */
+  border-radius: 0;
 }
 body.translucent .titlebar {
   background: transparent;
@@ -257,7 +273,7 @@ body.translucent .scrim {
   right: 0;
   bottom: 0;
   z-index: 2;
-  width: 340px;
+  width: 440px;
   max-width: 100%;
   display: flex;
   flex-direction: column;
@@ -271,6 +287,13 @@ body.translucent .scrim {
 .overlay.open {
   transform: translateX(0);
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
+}
+
+/* The overlay panes (Settings / Notifications, incl. the Languages section) get
+ * roomier padding than the slim translate base, so section text isn't crowded
+ * against the pane edges. */
+.overlay .body {
+  padding: var(--tl-sp-3) var(--tl-sp-4) var(--tl-sp-4);
 }
 
 /* ── Form primitives ─────────────────────────────────────────────────────── */
@@ -302,6 +325,9 @@ body.translucent .scrim {
 .textarea {
   min-height: 64px;
   resize: none;
+  /* The text you type scales with the Appearance text-size control (P2-012);
+     `font: inherit` above set it to the base, so override just the size here. */
+  font-size: calc(var(--tl-fs-base) * var(--tl-content-scale));
 }
 
 /* Use the same muted colour as the output's empty-state placeholder (Firefox
@@ -326,6 +352,21 @@ body.translucent .scrim {
 .textarea:focus {
   outline: none;
   border-color: var(--tl-text-muted);
+}
+
+/* The select reads as a pill with a custom caret to match the pill buttons,
+ * instead of the native macOS dropdown chrome. `appearance: none` strips the
+ * native arrow; the SVG chevron is a neutral grey that reads on both themes.
+ * Setting background-image (longhand) keeps the surface/glass background-color
+ * from the shared rule + the translucent override intact. */
+.select {
+  border-radius: 980px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.75 4.5 6 7.75 9.25 4.5' fill='none' stroke='%238a8a90' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
 }
 
 .row {
@@ -358,19 +399,28 @@ body.translucent .scrim {
 .btn {
   appearance: none;
   border: 1px solid var(--tl-border);
-  border-radius: var(--tl-radius);
-  padding: 6px var(--tl-sp-3);
+  border-radius: 980px; /* pill — a deliberate branded shape, not the native rect */
+  padding: 6px 14px;
   background: var(--tl-surface);
   color: var(--tl-text);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.04s ease;
 }
 
 .btn:hover:not(:disabled) {
   background: var(--tl-surface-hover);
+  border-color: var(--tl-text-muted);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px);
 }
 
 .btn:disabled {
@@ -378,23 +428,31 @@ body.translucent .scrim {
   cursor: not-allowed;
 }
 
-/* The single primary action is high-contrast: black on light, white on dark
- * (uses the text/background tokens, which invert per theme). */
+/* The single primary action carries the brand as a solid blue fill (the accent
+ * token, which already shifts lighter in dark mode) with white label + a soft
+ * brand glow. */
 .btn--primary {
-  border-color: transparent;
-  background: var(--tl-text);
-  color: var(--tl-bg);
+  border: none;
+  background: var(--tl-accent);
+  color: var(--tl-on-accent);
+  box-shadow: 0 0 14px rgba(90, 120, 255, 0.28);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: var(--tl-text);
-  opacity: 0.85;
+  background: var(--tl-accent-hover);
+  box-shadow: 0 0 22px rgba(90, 120, 255, 0.5);
 }
 
 /* The Translate button: reserve enough width for the longer "Translating…"
- * label so the label swap doesn't shift the row layout. */
+ * label so the label swap doesn't shift the row layout. `align-self: stretch`
+ * matches its height to the row's tallest item (the Target dropdown) so the two
+ * line up exactly at any text size; the flex centring keeps the label centred. */
 .btn--translate {
   min-width: 8.5rem;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── Output & text ───────────────────────────────────────────────────────── */
@@ -417,12 +475,16 @@ body.translucent .scrim {
   padding: var(--tl-sp-3);
   white-space: pre-wrap;
   word-break: break-word;
+  /* Translation result scales with the Appearance text-size control, matching
+     the input above (the empty-state `.output-body.hint` below stays at base). */
+  font-size: calc(var(--tl-fs-base) * var(--tl-content-scale));
 }
 
 /* Empty-state output placeholder: keep the muted `.hint` colour, but match the
-   input's placeholder font-size (the base 14px) so the two read consistently. */
+   input's placeholder size — which scales with the Appearance text-size control —
+   so the two read consistently at any size (overrides the generic `.hint` 12px). */
 .output-body.hint {
-  font-size: var(--tl-fs-base);
+  font-size: calc(var(--tl-fs-base) * var(--tl-content-scale));
 }
 
 /* Copy affordance, pinned in the field's bottom-right corner. Its surface

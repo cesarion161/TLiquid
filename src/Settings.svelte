@@ -39,12 +39,15 @@
     onUpdateAvailable = () => {},
     // Bubbles a translucency toggle up to App (flips the body `.translucent` class).
     onTranslucencyChange = () => {},
+    // Bubbles a text-size change up to App (sets the `--tl-fs-scale` root var live).
+    onFontScaleChange = () => {},
   }: {
     version?: string;
     hidden?: boolean;
     update?: UpdateStatus | null;
     onUpdateAvailable?: (status: UpdateStatus | null) => void;
     onTranslucencyChange?: (enabled: boolean) => void;
+    onFontScaleChange?: (scale: number) => void;
   } = $props();
 
   let configPath = $state<string | null>(null);
@@ -112,7 +115,12 @@
     <ShortcutSettings {settings} onChange={persist} {hidden} />
     <ProviderSettings {settings} onChange={persist} />
     <StartupSettings {settings} />
-    <AppearanceSettings {settings} onChange={onTranslucencyChange} />
+    <AppearanceSettings
+      {settings}
+      onChange={onTranslucencyChange}
+      {onFontScaleChange}
+      onFontScalePersist={persist}
+    />
   {/if}
 
   <div class="section">

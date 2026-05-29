@@ -14,14 +14,15 @@
 //!   under the tray icon; the user can drag it anywhere (via the titlebar drag
 //!   region) and the position is remembered across hides and restarts. Once it
 //!   has a place, summoning reuses it rather than re-anchoring.
-//! - Auto-hides when it loses focus (click outside / switch apps), Spotlight-
-//!   style; re-summon via the tray icon or a hotkey.
+//! - Dismisses on Esc (App.svelte), a close gesture (Cmd+W → CloseRequested), or
+//!   the tray. Losing focus no longer auto-hides (it was too aggressive); blur
+//!   only persists the window geometry. Re-summon via the tray icon or a hotkey.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{
-    AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, Theme, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
 
@@ -98,13 +99,16 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
         USER_SIZED.store(true, Ordering::Relaxed);
     }
 
-    // Apply the saved translucency preference (P2-012). No-op off macOS.
-    apply_translucency(&window, crate::config::load(app).ui.translucent);
+    // Apply the saved translucency + colour-theme preferences. No-op off macOS.
+    let cfg = crate::config::load(app);
+    apply_translucency(&window, cfg.ui.translucent);
+    apply_theme(&window, &cfg.ui.theme);
 
-    // Round the window so the OS clips the backdrop blur + shadow to match the
-    // panel's CSS rounded corners (otherwise the blur/shadow stay square).
+    // Match the native corner shape to translucency: square when translucent (so
+    // it lines up with the rectangular CGS blur — no corner halo), rounded when
+    // opaque. The CSS `.panel` mirrors this (`body.translucent` drops its radius).
     #[cfg(target_os = "macos")]
-    round_window_corners(&window, PANEL_CORNER_RADIUS);
+    round_window_corners(&window, panel_corner_radius(cfg.ui.translucent));
 
     let panel = window.clone();
     window.on_window_event(move |event| match event {
@@ -116,11 +120,13 @@ pub fn create_panel(app: &AppHandle) -> tauri::Result<()> {
             save_geometry(&panel);
             let _ = panel.hide();
         }
-        // Auto-hide when focus is lost (click outside / switch apps), like
-        // Spotlight/Raycast. Remember the spot/size if the user changed them.
+        // Losing focus (click outside / switch apps) no longer auto-hides — that
+        // proved too aggressive. The panel now dismisses only on Esc (App.svelte),
+        // Cmd+W (CloseRequested above), or the tray. We still persist the spot/size
+        // on blur so a drag-then-Esc keeps the moved position (Esc hides via JS and
+        // doesn't fire CloseRequested).
         WindowEvent::Focused(false) => {
             save_geometry(&panel);
-            let _ = panel.hide();
         }
         // We only reposition/resize the panel while it's hidden (before showing),
         // so a move/resize while it's visible is the user doing it — remember that.
@@ -155,7 +161,12 @@ pub fn show_panel(app: &AppHandle) -> tauri::Result<()> {
     // (Re-)apply the backdrop blur: the NSWindow's `windowNumber` is `0` until
     // first show, so the create-time call is a no-op. Calling on every show is
     // cheap and idempotent, and it also picks up a toggle made via `set_translucency`.
-    apply_translucency(&window, crate::config::load(app).ui.translucent);
+    let translucent = crate::config::load(app).ui.translucent;
+    apply_translucency(&window, translucent);
+    // Re-apply the corner shape here too: idempotent and cheap, it restores the
+    // mask if any AppKit event (e.g. an appearance change) dropped it while hidden.
+    #[cfg(target_os = "macos")]
+    round_window_corners(&window, panel_corner_radius(translucent));
     window.set_focus()?;
     Ok(())
 }
@@ -234,10 +245,23 @@ pub fn apply_translucency(window: &WebviewWindow, enabled: bool) {
 #[cfg(target_os = "macos")]
 const PANEL_BLUR_RADIUS: i32 = 30;
 
-/// Window corner radius. Kept in sync with the `.panel` CSS `border-radius` so
-/// the OS-level backdrop blur + shadow clip to the same rounded shape.
+/// Window corner radius when opaque. Kept in sync with the `.panel` CSS
+/// `border-radius` so the rounded content and shadow share one shape.
 #[cfg(target_os = "macos")]
 const PANEL_CORNER_RADIUS: f64 = 10.0;
+
+/// Corner radius to use for a given translucency state. Translucent → `0`
+/// (square), because the CGS backdrop blur fills the rectangular frame and can't
+/// be clipped; a square panel matches it, avoiding the corner halo. Opaque → the
+/// normal rounded radius. The `.panel` CSS mirrors this via `body.translucent`.
+#[cfg(target_os = "macos")]
+fn panel_corner_radius(translucent: bool) -> f64 {
+    if translucent {
+        0.0
+    } else {
+        PANEL_CORNER_RADIUS
+    }
+}
 
 /// Set the window's backdrop blur radius via the private CGS API. The window's
 /// `windowNumber` is `0` until it's been ordered in (first `show`), so this is
@@ -268,9 +292,15 @@ fn set_window_background_blur(window: &WebviewWindow, radius: i32) {
     }
 }
 
-/// Round the NSWindow's content-view layer so the OS clips both the rendered
-/// content AND the window-server-level backdrop blur + shadow to that shape
-/// (otherwise they'd stay rectangular around the CSS-rounded panel).
+/// Round the NSWindow's content-view layer and recompute the drop shadow so the
+/// shadow hugs the rounded content instead of the square frame.
+///
+/// NOTE: this does NOT round the window-server backdrop blur
+/// (`CGSSetWindowBackgroundBlurRadius`). That blur fills the whole rectangular
+/// window frame and shows through the panel's transparent corner triangles as a
+/// faint square halo. A window-server blur can't be clipped by a layer mask —
+/// rounded corners and the tunable CGS blur are fundamentally at odds (a fixed
+/// `NSVisualEffectView` would clip, but isn't tunable).
 #[cfg(target_os = "macos")]
 fn round_window_corners(window: &WebviewWindow, radius: f64) {
     use objc2::{msg_send, runtime::AnyObject};
@@ -293,6 +323,9 @@ fn round_window_corners(window: &WebviewWindow, radius: f64) {
         }
         let _: () = msg_send![layer, setCornerRadius: radius];
         let _: () = msg_send![layer, setMasksToBounds: true];
+        // The window's drop shadow is cached from the frame; recompute it so it
+        // hugs the rounded content instead of the square window rect.
+        let _: () = msg_send![ns_window, invalidateShadow];
     }
 }
 
@@ -301,6 +334,40 @@ fn round_window_corners(window: &WebviewWindow, radius: f64) {
 pub fn set_translucency(app: &AppHandle, enabled: bool) {
     if let Some(window) = app.get_webview_window(PANEL_LABEL) {
         apply_translucency(&window, enabled);
+        // The corner shape tracks translucency (square when on, rounded when off),
+        // so re-apply it as the toggle flips — otherwise the corners and the blur
+        // mismatch and the halo reappears (or rounded corners are lost).
+        #[cfg(target_os = "macos")]
+        round_window_corners(&window, panel_corner_radius(enabled));
+    }
+}
+
+/// Apply the colour-theme preference: `"light"`/`"dark"` force the appearance,
+/// anything else (`"system"`) follows the OS. On macOS the theme is app-wide and
+/// drives the webview's `prefers-color-scheme`, so the CSS `@media (prefers-
+/// color-scheme: dark)` block honours the choice with no separate dark selector.
+pub fn apply_theme(window: &WebviewWindow, theme: &str) {
+    let choice = match theme {
+        "light" => Some(Theme::Light),
+        "dark" => Some(Theme::Dark),
+        _ => None, // "system" (or any unknown value) → follow the OS
+    };
+    let _ = window.set_theme(choice);
+}
+
+/// Apply the colour-theme preference to the panel window by label, used by the
+/// `set_theme` command so the choice takes effect immediately.
+pub fn set_theme(app: &AppHandle, theme: &str) {
+    if let Some(window) = app.get_webview_window(PANEL_LABEL) {
+        apply_theme(&window, theme);
+        // Changing the macOS window appearance rebuilds the content-view's
+        // backing layer, which drops the corner mask we set at create time. Re-
+        // apply it (shape tracks translucency) so the corners don't revert.
+        #[cfg(target_os = "macos")]
+        {
+            let translucent = crate::config::load(app).ui.translucent;
+            round_window_corners(&window, panel_corner_radius(translucent));
+        }
     }
 }
 

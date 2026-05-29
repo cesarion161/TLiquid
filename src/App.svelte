@@ -15,8 +15,8 @@
   import Notifications from "./Notifications.svelte";
 
   // Esc backs out of an open overlay (Settings/Notifications) first; from the
-  // translate view it dismisses the whole panel (like clicking outside / blur,
-  // whose handler also remembers the window position).
+  // translate view it dismisses the whole panel. (Clicking outside no longer
+  // hides — blur only persists the window geometry; see windows.rs.)
   function onKeydown(e: KeyboardEvent) {
     if (e.key !== "Escape" || !isTauri()) return;
     if (view !== "translate") {
@@ -82,6 +82,22 @@
     translucent = enabled;
   }
 
+  // Translate-view text-size multiplier (Settings → Appearance, persisted as
+  // ui.fontScale). Pure CSS: styles.css scales ONLY the input + output text by
+  // `--tl-content-scale` (not the surrounding UI), so resizing the reading text
+  // doesn't reflow the rest of the panel — notably the Settings slider you drag.
+  // Initialized from settings on mount; updated live as the slider moves.
+  let fontScale = $state(1);
+  $effect(() => {
+    document.documentElement.style.setProperty(
+      "--tl-content-scale",
+      String(fontScale),
+    );
+  });
+  function setFontScale(scale: number) {
+    fontScale = scale;
+  }
+
   // Switch views; manual navigation drops any pending hotkey request so returning
   // to translate doesn't replay an old capture.
   function goTo(next: View) {
@@ -115,6 +131,7 @@
       const settings = await getSettings();
       startupPrompted = settings.startup.prompted;
       translucent = settings.ui.translucent;
+      fontScale = settings.ui.fontScale;
     } catch {
       /* leave assumed-answered (no badge) if settings can't load */
     }
@@ -155,12 +172,10 @@
 </script>
 
 <div class="panel">
-  <!-- Frameless window: this slim bar is the drag handle. Left: product name +
-       version. Right: bell + gear (on translate) or a back arrow (elsewhere). -->
+  <!-- Frameless window: this slim bar is the drag handle. Left: product
+       wordmark. Right: bell + gear (on translate) or a back arrow (elsewhere). -->
   <header class="titlebar" data-tauri-drag-region>
-    <span class="titlebar-title">
-      TLiquid <span class="titlebar-version">v{version}</span>
-    </span>
+    <span class="titlebar-title">T·Liquid</span>
     {#if view === "translate"}
       <button
         class="icon-btn bell"
@@ -272,6 +287,7 @@
           update={pendingUpdate}
           onUpdateAvailable={(s) => (pendingUpdate = s)}
           onTranslucencyChange={setTranslucent}
+          onFontScaleChange={setFontScale}
         />
         <Notifications
           hidden={view !== "notifications"}
@@ -285,8 +301,8 @@
 </div>
 
 <style>
-  /* Product name + version on the left of the titlebar; pushes the action
-     buttons to the right (margin-right: auto). Part of the drag region. */
+  /* Product wordmark on the left of the titlebar; pushes the action buttons to
+     the right (margin-right: auto). Part of the drag region. */
   .titlebar-title {
     margin-right: auto;
     padding-left: var(--tl-sp-2);
@@ -294,10 +310,6 @@
     font-weight: 600;
     color: var(--tl-text);
     white-space: nowrap;
-  }
-  .titlebar-version {
-    font-weight: 400;
-    color: var(--tl-text-muted);
   }
 
   /* Unread badge on the notification bell. */

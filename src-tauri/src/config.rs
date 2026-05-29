@@ -50,6 +50,12 @@ pub struct Ui {
     /// Transparency setting automatically (AppKit renders the material opaque).
     #[serde(default = "default_true")]
     pub translucent: bool,
+    /// Multiplier for body/content text size (inputs, output, labels). 1.0 is the
+    /// default; the Appearance slider ranges 0.8–1.4. Pure CSS (App.svelte sets
+    /// `--tl-fs-scale`), so it persists through `save_settings` like other UI
+    /// prefs. Defaulted so settings files written before this field load.
+    #[serde(default = "default_font_scale")]
+    pub font_scale: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -85,6 +91,10 @@ pub struct Shortcuts {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_font_scale() -> f64 {
+    1.0
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -176,6 +186,7 @@ impl Default for Settings {
                 accent_color: "default".into(),
                 open_result_from: "menu_bar".into(),
                 translucent: true,
+                font_scale: 1.0,
             },
             languages: Languages {
                 // English is the mandatory default primary language (FR-022).

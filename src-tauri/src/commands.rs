@@ -25,15 +25,16 @@ pub fn get_settings(app: AppHandle) -> Settings {
 
 #[tauri::command]
 pub fn save_settings(app: AppHandle, mut settings: Settings) -> Result<()> {
-    // `startup` (launch-at-login, P1-001) and `ui.translucent` (P2-012) are
-    // server-authoritative: each is changed only via its own command
-    // (`set_launch_at_login` / `set_translucency`). The translate and settings
-    // views each hold their own loaded `Settings`, so a full-object save from a
-    // possibly-stale copy must NOT overwrite these, or it could undo a just-made
-    // choice. Preserve the on-disk values.
+    // `startup` (launch-at-login, P1-001), `ui.translucent` (P2-012), and
+    // `ui.theme` are server-authoritative: each is changed only via its own
+    // command (`set_launch_at_login` / `set_translucency` / `set_theme`). The
+    // translate and settings views each hold their own loaded `Settings`, so a
+    // full-object save from a possibly-stale copy must NOT overwrite these, or it
+    // could undo a just-made choice. Preserve the on-disk values.
     let on_disk = config::load(&app);
     settings.startup = on_disk.startup;
     settings.ui.translucent = on_disk.ui.translucent;
+    settings.ui.theme = on_disk.ui.theme;
     config::save(&app, &settings)
 }
 
@@ -285,6 +286,19 @@ pub fn set_translucency(app: AppHandle, enabled: bool) -> Result<()> {
     settings.ui.translucent = enabled;
     config::save(&app, &settings)?;
     crate::windows::set_translucency(&app, enabled);
+    Ok(())
+}
+
+/// Set the colour theme (`"light"` / `"dark"` / `"system"`) and apply it live.
+/// Like translucency, `ui.theme` is server-authoritative: this persists it and
+/// updates the window appearance (which on macOS drives the webview's
+/// `prefers-color-scheme`), so the choice survives a stale `save_settings`.
+#[tauri::command]
+pub fn set_theme(app: AppHandle, theme: String) -> Result<()> {
+    let mut settings = config::load(&app);
+    settings.ui.theme = theme.clone();
+    config::save(&app, &settings)?;
+    crate::windows::set_theme(&app, &theme);
     Ok(())
 }
 

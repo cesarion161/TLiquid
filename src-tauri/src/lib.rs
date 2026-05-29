@@ -16,6 +16,7 @@ mod config;
 mod diagnostics;
 mod error;
 mod languages;
+mod menu;
 mod providers;
 mod secrets;
 mod shortcuts;
@@ -55,6 +56,7 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 
     builder
+        .on_menu_event(menu::on_event)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -95,6 +97,11 @@ pub fn run() {
             // show rather than a fresh webview load (PRD §13.2).
             windows::create_panel(app.handle())?;
             tray::create(app.handle())?;
+
+            // Custom macOS menu: repurpose Cmd+Q to hide (keeping the process +
+            // global hotkey alive) while preserving Cmd+W and the clipboard
+            // shortcuts. Real quit stays in the tray menu. See `menu.rs`.
+            menu::install(app.handle())?;
 
             // Holds the update found by the most recent check so the install
             // command can apply it without re-fetching (P2-007).
@@ -151,6 +158,7 @@ pub fn run() {
             commands::check_for_update,
             commands::download_and_install_update,
             commands::set_translucency,
+            commands::set_theme,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TLiquid");

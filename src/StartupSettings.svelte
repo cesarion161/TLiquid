@@ -46,7 +46,7 @@
       checked={settings.startup.enabled}
       onchange={toggle}
     />
-    <span class="grow">Launch TLiquid at login</span>
+    <span class="grow">Launch T·Liquid at login</span>
   </label>
   <p class="hint">Starts in the menu bar, ready for the translate hotkey.</p>
 

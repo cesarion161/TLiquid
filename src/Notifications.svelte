@@ -88,9 +88,9 @@
 
     {#if !startupPrompted}
       <div class="field">
-        <span class="label">Launch TLiquid at login?</span>
+        <span class="label">Launch T·Liquid at login?</span>
         <p class="hint">
-          Recommended — TLiquid starts in the menu bar, ready for the translate
+          Recommended — T·Liquid starts in the menu bar, ready for the translate
           hotkey. You can change this anytime in Settings → Startup.
         </p>
         <div class="row">
