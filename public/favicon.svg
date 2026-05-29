@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="120" x2="904" y2="904" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2440ff"/><stop offset="0.55" stop-color="#5b2fe6"/><stop offset="1" stop-color="#8a2bd8"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.32" cy="0.22" r="0.75">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.20"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.05"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="vig" x1="512" y1="512" x2="512" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.16"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="13" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter></defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#vig)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#sheen)"/>
+  <g filter="url(#glow)"><circle cx="219.32" cy="349.40" r="27.32" fill="#ffffff"/><circle cx="284.36" cy="349.40" r="27.32" fill="#ffffff"/><circle cx="349.40" cy="349.40" r="27.32" fill="#ffffff"/><circle cx="414.44" cy="349.40" r="27.32" fill="#ffffff"/><circle cx="479.48" cy="349.40" r="27.32" fill="#ffffff"/><circle cx="544.52" cy="349.40" r="27.32" fill="#ffffff"/><circle cx="609.56" cy="349.40" r="27.32" fill="#ffffff"/><circle cx="414.44" cy="414.44" r="27.32" fill="#ffffff"/><circle cx="414.44" cy="479.48" r="27.32" fill="#ffffff"/><circle cx="414.44" cy="544.52" r="27.32" fill="#ffffff"/><circle cx="414.44" cy="609.56" r="27.32" fill="#ffffff"/><circle cx="414.44" cy="674.60" r="27.32" fill="#ffffff"/><circle cx="739.64" cy="544.52" r="27.32" fill="#ffffff"/><circle cx="804.68" cy="544.52" r="27.32" fill="#ffffff"/><circle cx="739.64" cy="609.56" r="27.32" fill="#ffffff"/><circle cx="804.68" cy="609.56" r="27.32" fill="#ffffff"/></g>
+</svg>

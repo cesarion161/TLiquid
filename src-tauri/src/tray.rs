@@ -8,6 +8,7 @@
 
 use crate::windows;
 use tauri::{
+    image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter,
@@ -17,20 +18,22 @@ use tauri::{
 pub const TRAY_ID: &str = "tliquid";
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open TLiquid", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open T·Liquid", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit TLiquid", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit T·Liquid", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &settings, &separator, &quit])?;
 
-    let icon = app
-        .default_window_icon()
-        .expect("bundled default window icon")
-        .clone();
+    // Dedicated menu-bar glyph — a full-bleed monochrome "T·" mark, not the padded
+    // Dock squircle (`default_window_icon`), which renders small and out-of-place
+    // among the bar's template glyphs. Marked as a template image so AppKit fills
+    // the bar height and tints it for the light/dark menu bar.
+    let icon = Image::from_bytes(include_bytes!("../icons/tray-icon.png"))?;
 
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
-        .tooltip("TLiquid")
+        .icon_as_template(true)
+        .tooltip("T·Liquid")
         .menu(&menu)
         // Left-click summons the panel; the menu opens on right-click.
         .show_menu_on_left_click(false)
